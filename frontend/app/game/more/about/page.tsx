@@ -2,57 +2,151 @@ import Link from "next/link";
 import { MorePage } from "@/components/MorePage";
 import { site, gridMine } from "@/lib/site";
 
-// About — what Grid Mine is, in plain language.
+// About — the full protocol doc (ORE-style: Intro, Vision, Mining, Staking, Tokenomics, Links).
 export const metadata = { title: "About — Drip" };
+
+const burn = gridMine.cutSplitBurnBps / 100;
+const stakers = gridMine.cutSplitStakersBps / 100;
+const winners = gridMine.cutSplitWinnersBps / 100;
+const mother = gridMine.cutSplitMotherlodeBps / 100;
 
 export default function AboutPage() {
   return (
-    <MorePage title="About" subtitle={site.tagline}>
-      <div className="space-y-4 text-sm leading-relaxed text-mute">
-        <p>
-          <span className="font-semibold text-white">Grid Mine</span> is a fast on-chain game for
-          <span className="text-white"> {site.ticker}</span> on {site.chain}, launched via the{" "}
-          <span className="text-white">{site.launchpad}</span> launchpad. It adapts ORE&rsquo;s 5×5 grid: every
-          round you deploy USDG onto tiles, a secure RNG picks one winning tile, and the losing stake is
-          redistributed to the winners.
-        </p>
-        <div className="rounded-2xl border border-line bg-panel p-4 text-white">
-          <div className="grid grid-cols-2 gap-y-3 text-sm">
-            <Fact label="Grid" value={`5×5 · ${gridMine.tiles} tiles`} />
-            <Fact label="Round" value={`${gridMine.roundSeconds}s`} />
-            <Fact label="Deploy asset" value={gridMine.deployAsset} />
-            <Fact label="Winner odds" value={`1 / ${gridMine.tiles} per tile`} />
-            <Fact label="Winners get" value="90% of loser pot (USDG)" />
-            <Fact label="Cut" value={`${gridMine.loserCutBps / 100}% → buys DRIP`} />
+    <MorePage title="About" subtitle="Learn about the protocol.">
+      <div className="space-y-10 text-sm leading-relaxed text-mute">
+        <Section id="intro" title="Intro">
+          <p>
+            <span className="text-white">{site.ticker}</span> is a fair-launch token and on-chain game
+            on <span className="text-white">{site.chain}</span>, launched via the{" "}
+            <span className="text-white">{site.launchpad}</span> launchpad. Its core loop, Grid Mine, is
+            adapted from ORE: a fast 5×5 game where players deploy USDG onto tiles and the losing stake is
+            redistributed to the winners every round.
+          </p>
+        </Section>
+
+        <Section id="vision" title="Vision">
+          <p>
+            Most token games either mint endlessly until the chart bleeds out, or hand a cut to a team that
+            never had skin in the game. Drip does neither. The team holds <span className="text-white">zero</span>{" "}
+            tokens, and DRIP is <span className="text-white">fixed-supply — never minted.</span>
+          </p>
+          <p className="mt-3">
+            Every reward is <span className="text-white">bought</span> from the open market with the protocol
+            cut, so each round is real buy pressure, and most of what&rsquo;s bought is burned. The result is a
+            game whose economics get tighter the more it&rsquo;s played — a monetary sink dressed as a minute-long
+            game, on a chain built for real assets.
+          </p>
+        </Section>
+
+        <Section id="mining" title="Mining">
+          <p>Mining is how you play — and how value moves each round.</p>
+          <h3 className="mt-4 text-base font-semibold text-white">How it works</h3>
+          <p className="mt-1.5">
+            Each round, miners have {gridMine.roundSeconds} seconds to deploy USDG onto tiles of a 5×5 grid. At
+            the close, a secure on-chain RNG picks one winning tile ({`1 / ${gridMine.tiles}`}). All USDG on the
+            losing tiles is split among the winners in proportion to their stake on the winning tile. A flat{" "}
+            {gridMine.adminFeeBps / 100}% entry fee is skimmed at deploy, before funds enter the pool, so it never
+            touches the win/loss math.
+          </p>
+          <h3 className="mt-4 text-base font-semibold text-white">1-or-all</h3>
+          <p className="mt-1.5">
+            The USDG pot is always pro-rata. The round&rsquo;s DRIP flips a coin: half the time one weighted winner
+            takes it all; half the time everyone on the tile shares.
+          </p>
+          <h3 className="mt-4 text-base font-semibold text-white">Motherlode</h3>
+          <p className="mt-1.5">
+            Each round, a slice of the cut grows the motherlode. On a {`1 / ${gridMine.motherlodeOdds}`} hit, the
+            whole jackpot dumps onto that round&rsquo;s winners; otherwise it keeps accumulating.
+          </p>
+          <h3 className="mt-4 text-base font-semibold text-white">Refining</h3>
+          <p className="mt-1.5">
+            A {gridMine.refineFeeBps / 100}% refining fee applies to DRIP rewards when claimed, redistributed to
+            holders who haven&rsquo;t claimed yet. The longer you hold unrefined DRIP, the more you collect — value
+            flows to longer-term holders.
+          </p>
+        </Section>
+
+        <Section id="staking" title="Staking">
+          <p>DRIP holders can stake to earn yield from protocol revenue.</p>
+          <h3 className="mt-4 text-base font-semibold text-white">How it works</h3>
+          <p className="mt-1.5">
+            {gridMine.loserCutBps / 100}% of each round&rsquo;s loser pot is collected as protocol revenue and used
+            to buy DRIP off the open market. Of the DRIP bought, {burn}% is burned, {winners}% goes to that
+            round&rsquo;s winners, {mother}% grows the motherlode, and {stakers}% is streamed to stakers as yield —
+            so stakers earn from both the buy pressure and the revenue share.
+          </p>
+        </Section>
+
+        <Section id="tokenomics" title="Tokenomics">
+          <p>DRIP is optimized for long-term holders.</p>
+          <h3 className="mt-4 text-base font-semibold text-white">Supply</h3>
+          <p className="mt-1.5">
+            DRIP is a fair-launch token with a <span className="text-white">fixed</span> supply and zero insider or
+            team allocation. The entire supply is created once at deploy and handed to the {site.launchpad} launch,
+            which seeds the DRIP/USDG pool. The protocol <span className="text-white">never mints</span> — it only
+            buys and burns.
+          </p>
+          <h3 className="mt-4 text-base font-semibold text-white">Fees</h3>
+          <ul className="mt-1.5 space-y-1.5">
+            {[
+              `${gridMine.adminFeeBps / 100}% of each deploy → marketing/ops (skimmed at deploy, before the pool).`,
+              `${gridMine.loserCutBps / 100}% of each loser pot → buys DRIP (the buyback).`,
+              `${stakers}% of bought DRIP → stakers as yield.`,
+              `${winners}% of bought DRIP → the round's winners.`,
+              `${burn}% of bought DRIP → burned.`,
+              `${gridMine.refineFeeBps / 100}% refining fee on claimed DRIP → unclaimed holders.`,
+            ].map((f) => (
+              <li key={f} className="flex gap-2.5">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-lime" />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section id="links" title="Links">
+          <p>Key links and information.</p>
+          <h3 className="mt-4 text-base font-semibold text-white">Contract</h3>
+          <p className="mt-1.5">
+            {site.launched && site.contractAddress ? (
+              <span className="break-all font-mono text-xs text-white">{site.contractAddress}</span>
+            ) : (
+              <>
+                DRIP is <span className="text-white">not deployed yet.</span> There is no official contract address —
+                anything claiming one before launch is a scam. This app is a pre-launch demo (fake funds, no chain).
+              </>
+            )}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              { label: "GitHub", href: site.links.github },
+              { label: "Spec", href: site.links.spec },
+              { label: "Docs", href: site.links.docs },
+              { label: "X", href: site.links.x },
+            ].map((l) => (
+              <a key={l.label} href={l.href} target="_blank" rel="noreferrer"
+                className="rounded-lg border border-line bg-panel px-4 py-2 text-sm font-semibold text-white hover:border-mute/50">
+                {l.label}
+              </a>
+            ))}
           </div>
-        </div>
-        <p>
-          The 10% cut buys DRIP from the pool and splits it {gridMine.cutSplitBurnBps / 100}% burn /
-          {" "}{gridMine.cutSplitStakersBps / 100}% stakers / {gridMine.cutSplitWinnersBps / 100}% winners /
-          {" "}{gridMine.cutSplitMotherlodeBps / 100}% motherlode. DRIP is fixed-supply — the game never mints; it
-          only buys. See <Link href="/game/more/rewards" className="text-lime hover:underline">Rewards</Link> for the
-          full breakdown and <Link href="/game/more/shield" className="text-lime hover:underline">Shield</Link> for
-          the fair-play guarantees.
+        </Section>
+
+        <p className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-xs">
+          <span className="font-semibold text-yellow-500">Honest note.</span> Grid Mine is a real-money game of
+          chance by design, and this is a pre-launch demo. Nothing runs on mainnet until secure randomness and legal
+          review are in place. See <Link href="/game/more/shield" className="text-lime hover:underline">Shield</Link>.
         </p>
-        <p className="rounded-2xl border border-line bg-panel/60 p-4 text-xs">
-          This app is a <span className="text-white">pre-launch demo</span> — fake funds, no chain. It&rsquo;s a
-          real-money game of chance by design; nothing runs on mainnet until secure randomness and legal review are
-          done.
-        </p>
-        <div className="flex gap-3 pt-1">
-          <a href={site.links.github} target="_blank" rel="noreferrer" className="flex-1 rounded-xl border border-line bg-panel py-2.5 text-center text-sm font-semibold text-white hover:border-mute/50">GitHub</a>
-          <a href={site.links.docs} target="_blank" rel="noreferrer" className="flex-1 rounded-xl border border-line bg-panel py-2.5 text-center text-sm font-semibold text-white hover:border-mute/50">Docs</a>
-        </div>
       </div>
     </MorePage>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wide text-mute">{label}</div>
-      <div className="font-semibold">{value}</div>
-    </div>
+    <section id={id} className="scroll-mt-24">
+      <h2 className="mb-3 text-2xl font-semibold tracking-tight text-white">{title}</h2>
+      {children}
+    </section>
   );
 }

@@ -161,7 +161,7 @@ export default function MinePage() {
                   className={`relative aspect-square rounded-xl border transition-all ${sel ? "border-white ring-1 ring-white/60" : "border-line bg-panel/40 hover:border-mute/50"} ${t.mine > 0 ? "bg-lime/5" : ""}`}>
                   {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
                   <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[10px] font-medium text-mute">
-                    <Bars /> {fmt(total, total >= 1 ? 1 : 3)}
+                    <Drop /> {fmt(total, total >= 1 ? 1 : 3)}
                   </div>
                 </button>
               );
@@ -175,7 +175,7 @@ export default function MinePage() {
         <div className="px-4 pt-6">
           <div className="text-center">
             <div className="text-5xl font-semibold tracking-tight text-white">{fmt(amount, 0)}</div>
-            <div className="mt-1 flex justify-center"><Bars big /></div>
+            <div className="mt-1 flex justify-center"><Drop big /></div>
           </div>
           <div className="mt-5 grid grid-cols-4 gap-2">
             {[
@@ -200,7 +200,7 @@ export default function MinePage() {
             )}
             <Row label="ROUNDS"><span className="font-semibold text-mute">1</span></Row>
             <Row label="PER ROUND">
-              <span className="flex items-center gap-1 font-semibold text-white"><Bars /> {fmt(amount, 0)}</span>
+              <span className="flex items-center gap-1 font-semibold text-white"><Drop /> {fmt(amount, 0)}</span>
             </Row>
           </div>
 
@@ -242,7 +242,7 @@ export default function MinePage() {
               </span>
               <span className="flex items-center gap-3 text-mute">
                 <span className="text-xs">▦ {m.t}</span>
-                <span className="flex items-center gap-1 font-semibold text-white"><Bars /> {fmt(m.v, 2)}</span>
+                <span className="flex items-center gap-1 font-semibold text-white"><Drop /> {fmt(m.v, 2)}</span>
               </span>
             </div>
           ))}
@@ -260,7 +260,7 @@ function Stat({ label, value, accent, gold, danger, border }: { label: string; v
   return (
     <div className={border ? "border-x border-line/60" : ""}>
       <div className={`flex items-center justify-center gap-1.5 text-2xl font-semibold ${danger ? "text-red-400" : gold ? "text-yellow-500" : "text-white"}`}>
-        {accent && <Bars />}
+        {accent && <Drop />}
         {gold && <span className="text-yellow-500">◎</span>}
         {value}
       </div>
@@ -278,12 +278,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-// Small DRIP/USDG glyph (stacked bars, lime).
-function Bars({ big }: { big?: boolean }) {
+// Small DRIP/USDG glyph — a lime droplet (the Drip mark), not the old tri-bar icon.
+function Drop({ big }: { big?: boolean }) {
   const s = big ? 22 : 12;
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block">
-      <path d="M4 6h13l3 3H7L4 6z" fill="#c6f24e" /><path d="M4 12h13l3 3H7l-3-3z" fill="#8b7cf6" opacity="0.9" /><path d="M4 18h13l3-3H7l-3 3z" fill="#22d3ee" opacity="0.7" />
+    <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block" aria-hidden="true">
+      <path d="M12 2.5c4 5 6.6 8.3 6.6 11.6a6.6 6.6 0 1 1-13.2 0C5.4 10.8 8 7.5 12 2.5z" fill="#c6f24e" />
     </svg>
   );
 }

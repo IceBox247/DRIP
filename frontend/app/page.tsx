@@ -35,12 +35,18 @@ export default function Home() {
                   A round every 60 seconds. One tile wins. Nothing is minted, the team holds zero.
                 </p>
 
-                <div className="mt-8">
+                <div className="mt-8 flex items-center gap-5">
                   <Link
                     href={site.links.game}
                     className="inline-block rounded-lg bg-lime px-8 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
                   >
                     Mine
+                  </Link>
+                  <Link
+                    href="/game/more/about#vision"
+                    className="text-sm font-semibold text-mute transition-colors hover:text-white"
+                  >
+                    Read vision
                   </Link>
                 </div>
 
