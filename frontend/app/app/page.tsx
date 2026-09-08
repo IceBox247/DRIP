@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
-import { ContractStrip } from "@/components/ContractStrip";
 import { site } from "@/lib/site";
 
 // Dashboard SHELL / preview. Live wallet-connect, X OAuth and real points are Phase 2 (need the
@@ -11,7 +10,6 @@ export default function AppDashboard() {
   return (
     <>
       <Nav />
-      <ContractStrip />
       <main className="mx-auto max-w-content px-5 py-12">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>

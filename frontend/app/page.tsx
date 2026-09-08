@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
-import { ContractStrip } from "@/components/ContractStrip";
 import { GridHero } from "@/components/GridHero";
 import { site, stats, steps, faqs } from "@/lib/site";
 
@@ -10,7 +9,6 @@ export default function Home() {
   return (
     <>
       <Nav />
-      <ContractStrip />
       <main>
         {/* Hero */}
         <section className="relative overflow-hidden hero-glow">
