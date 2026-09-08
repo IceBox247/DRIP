@@ -3,10 +3,10 @@ import { Logo } from "./Logo";
 import { site } from "@/lib/site";
 
 const navLinks = [
-  { href: "/#how", label: "How it works" },
-  { href: "/#rewards", label: "Rewards" },
-  { href: "/game", label: "Grid Mine" },
-  { href: "/#faq", label: "FAQ" },
+  { href: "/game", label: "Mine" },
+  { href: "/game/stake", label: "Stake" },
+  { href: "/game/explore", label: "Explore" },
+  { href: "/game/more/about", label: "About" },
 ];
 
 export function Nav() {

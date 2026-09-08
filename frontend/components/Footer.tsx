@@ -9,17 +9,17 @@ export function Footer() {
           <div className="max-w-sm">
             <Logo className="text-white" />
             <p className="mt-3 text-sm text-mute">
-              A fair-launch token on {site.chain}, launched via {site.launchpad}. Rewards paid in
-              tokenized stock.
+              A fair-launch token on {site.chain}, launched via {site.launchpad}. Mine the grid for
+              USDG &amp; DRIP.
             </p>
           </div>
 
           <div className="flex gap-12">
             <div className="flex flex-col gap-2 text-sm">
               <span className="mb-1 text-xs uppercase tracking-wide text-mute/70">Product</span>
-              <a href="/#how" className="text-mute hover:text-white">How it works</a>
-              <a href="/#rewards" className="text-mute hover:text-white">Rewards</a>
-              <a href="/#referrals" className="text-mute hover:text-white">Referrals</a>
+              <a href="/game" className="text-mute hover:text-white">Mine</a>
+              <a href="/game/stake" className="text-mute hover:text-white">Stake</a>
+              <a href="/game/explore" className="text-mute hover:text-white">Explore</a>
             </div>
             <div className="flex flex-col gap-2 text-sm">
               <span className="mb-1 text-xs uppercase tracking-wide text-mute/70">Resources</span>
