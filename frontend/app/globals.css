@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: theme("colors.ink");
+  color: #eef0f2;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle radial glow behind the hero, echoing the Robinhood Chain ecosystem look. */
+.hero-glow {
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(198, 242, 78, 0.10), transparent 70%),
+    radial-gradient(40% 40% at 80% 10%, rgba(198, 242, 78, 0.05), transparent 70%);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(70% 60% at 50% 0%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(70% 60% at 50% 0%, #000 40%, transparent 100%);
+}

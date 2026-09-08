@@ -1,29 +1,60 @@
-# Frontend — web + mobile app (Phase 2)
+# Drip — web (Next.js)
 
-User-facing app for the Drip mining node (SPEC §6).
+Marketing site + app shell for Drip ($DRIP). **Next.js 14 (App Router) + TypeScript + Tailwind.**
+Deploys to Vercel with zero config.
 
-## Screens / features
+## Routes
 
-- **Node dashboard** — start/stop the mining node (server-side accrual timer — **not** real
-  mining), show live status.
-- **Hash rate** — current hash rate and its breakdown (base + holdings + task boosts + referral
-  boosts; SPEC §2.2).
-- **Claimable stock** — this cycle's accrued points and claimable Stock Token allocation; claim via
-  Merkle proof from `RewardVault` (SPEC §2.4).
-- **Referral** — the user's unique referral link; referred users must connect X to attribute the
-  referral (SPEC §4).
-- **Task list** — social/engagement tasks (retweet, comment, follow) that grant hash-rate boosts
-  (SPEC §5).
-- **Auth** — wallet connect + X OAuth (SPEC §6).
+| Route | What it is | Status |
+|---|---|---|
+| `/` | Landing page — concept, how it works, rewards engine, referrals, tasks, fee flow, FAQ | Live |
+| `/app` | Dashboard **shell** — connect wallet/X, hash rate, claimable, referral link | Preview (static placeholders) |
 
-## Compliance (see docs/BLOCKERS.md)
+The dashboard is intentionally a static preview: live wallet-connect, X OAuth, and real points/claims
+are **Phase 2** and need the backend (see [`../docs/ROADMAP.md`](../docs/ROADMAP.md)). Buttons that
+require the backend are disabled and labeled.
 
-- **US-person geoblock** at the edge and in-app. Gate access for blocked jurisdictions.
-- No yield/return/investment promises in copy. Present rewards factually, not as an expectation of
-  profit.
-- Referral copy must avoid recruitment/Ponzi framing.
+## Local development
 
-## Not yet chosen
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:3000
+```
 
-Web framework, mobile approach (native vs. cross-platform), and wallet-connect library are open.
-Document choices here when made.
+```bash
+npm run build    # production build
+npm start        # serve the production build
+```
+
+## Deploy on Vercel
+
+Because this app lives in the `frontend/` subdirectory, point Vercel at it:
+
+**Option A — dashboard (recommended):**
+1. Import the GitHub repo `IceBox247/DRIP` into Vercel.
+2. Set **Root Directory** to `frontend`.
+3. Framework preset **Next.js** is auto-detected — Build `next build`, Output handled automatically.
+4. Deploy. (Set any env vars under Project → Settings → Environment Variables.)
+
+**Option B — CLI:**
+```bash
+npm i -g vercel
+cd frontend
+vercel            # first run links/creates the project
+vercel --prod     # production deploy
+```
+
+## Editing content
+
+Copy and display values live in [`lib/site.ts`](./lib/site.ts) (site name, links, stats, steps,
+FAQs). Update links there — the `github`, `x`, and `spec` URLs are placeholders. The reward numbers
+shown mirror [`../config/constants.example.json`](../config/constants.example.json) and
+[`../docs/SPEC.md`](../docs/SPEC.md); they are defaults/targets, not final.
+
+## Compliance note
+
+Marketing copy deliberately avoids yield/return/profit promises, and the footer carries a
+not-advice + no-US-persons + geo-restriction notice (see [`../docs/BLOCKERS.md`](../docs/BLOCKERS.md)
+#2). Keep that posture when editing. Real geoblocking must be enforced server-side before launch —
+the footer notice is not a substitute.
