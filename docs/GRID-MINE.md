@@ -20,43 +20,43 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
    onto one or more tiles.
 3. Round closes. A **secure RNG** picks one winning tile (each tile 1/25 = 4%).
 4. **Loser pot** = stake on the 24 losing tiles.
-5. **Protocol cut** = `LOSER_CUT_BPS` of the loser pot (ORE ~10%). Rest is the **winner pot**.
-6. Winners on the winning tile split the winner pot **pro-rata by their stake on that tile**.
-7. Each round emits **~1 DRIP** to winners — paid from a **pre-funded emissions reserve** (see
-   "Emissions" — we do NOT mint).
-8. **Motherlode** jackpot: `+MOTHERLODE_PER_ROUND` DRIP added each round; a `1/625` chance it all
-   dumps on the winning tile.
-9. Protocol cut → **Buyback**: buy DRIP in the Uniswap v4 pool, burn most, small slice to stakers.
+5. **Admin fee** = 1% of gross deploys → marketing/ops (taken from the loser stake, never from
+   winners' returned principal).
+6. **Protocol cut** = 10% of the loser pot (USDG). The rest of the loser pot (90%) is the **winner
+   pot**, split among the winning tile **pro-rata by stake**, paid in **USDG**.
+7. The 10% cut **buys DRIP** from the DRIP/USDG pool (Pons seeds it at launch), and the bought DRIP
+   is split **70% burned / 10% stakers / 10% winners / 10% motherlode**.
+8. **Motherlode**: the 10% motherlode slice accrues in DRIP each round; a `1/625` hit adds the whole
+   jackpot to that round's winners.
+9. **Refining:** winners' DRIP accrues in `RefiningVault`; claiming costs 10% → to holders who
+   haven't claimed.
 
 Spreading across tiles = win often, small. Stacking one tile = rare, fat. Rounds stay ~1 minute —
 that cadence is the product.
 
-## Emissions — mint model (shipped v1) vs reserve model
+## Rewards are BOUGHT, not minted (shipped v2)
 
-Two ways to pay the ~1 DRIP/round emission:
+**DRIP is fixed supply — the game never mints.** Every DRIP reward is *bought* from the market with
+the USDG cut, so each round is net buy pressure on DRIP. The whole supply is created once at deploy
+and handed to the Pons launch, which seeds the DRIP/USDG pool the game trades against.
 
-- **Mint model (shipped v1 — `contracts/src/game/`):** `DripMineToken` is a **capped** ERC-20 whose
-  **only minter is GridMine**, set once then **locked** (`lockMinter()`), no team allocation. GridMine
-  mints the round emission to winners up to the hard cap. This is ORE's model, ported.
-- **Reserve model (alternative):** pre-mint the whole cap to a **locked reserve** and have GridMine
-  *pay* from it instead of minting. Keeps a strictly fixed supply with no mint authority at all —
-  better if DRIP must be a Pons fixed-supply fair launch (SPEC §1, DECISIONS #6/#8).
+Per round, the 10% USDG cut is swapped to DRIP and split (of the bought DRIP):
 
-v1 ships the mint model because it matches ORE and is simplest; the cap + locked-minter + zero team
-allocation keep it credible. Switching to the reserve model later is a localized change (swap the
-`drip.mint(...)` call in `GridMine.harvest` for a `reserve.release(...)`).
+| Slice | % of bought DRIP | Goes to |
+|---|---|---|
+| Burn | 70% | burned ("bond"/bury) — deflationary |
+| Stakers | 10% | `StakeVault` |
+| Winners | 10% | this round's winners (via `RefiningVault`) |
+| Motherlode | 10% | jackpot pool; dumps to winners on a 1/625 hit |
+
+This replaces ORE's "mint 1 token/round." Marketing is funded separately by the **1% admin fee**, not
+from this cut. Requires the DRIP/USDG pool to exist (Pons provides it at launch) — the swap is
+slippage-bounded via a keeper-supplied `minDripOut`.
 
 ## Anti-dump: refining (claim tax)
 
-Winners' DRIP accrues in a `RefiningVault`. Claiming costs `REFINE_FEE_BPS` (ORE ~10%), and that fee
+Winners' bought DRIP accrues in a `RefiningVault`. Claiming costs `REFINE_FEE_BPS` (10%), and that fee
 is redistributed to **holders who have not yet claimed** — fast sellers subsidize diamond hands.
-
-## Buyback / burn
-
-Protocol cut (in the deploy asset) → swap to DRIP in the `DRIP/<deploy asset>` Uniswap v4 pool →
-**burn `BURN_BPS` (ORE ~90%)**, remainder to stakers. If buybacks outrun emissions, effective float
-shrinks. Without the buyback this is just a 25-square casino — it's the buyback that makes it a
-token engine.
 
 ## Randomness — do NOT use blockhash/timestamp alone
 
@@ -89,29 +89,33 @@ if winners receive stock; paying winners in the same deploy asset is simplest. D
 
 | File | Role | Status |
 |---|---|---|
-| `contracts/src/game/DripMineToken.sol` | Capped ERC-20; only GridMine mints (set once + locked); no team. | ✅ implemented + tested |
-| `contracts/src/game/GridMine.sol` | Rounds, `deploy(tile,amount)`, close, RNG winner, `harvest` payout, protocol cut. | ✅ implemented + tested |
-| `contracts/src/game/RefiningVault.sol` | Holds winners' DRIP; 10% claim tax redistributed to unclaimed (acc pattern). | ✅ implemented + tested |
-| `contracts/src/game/Buyback.sol` | Protocol cut → swap to DRIP → burn 90%, 10% to stakers. | ✅ implemented + tested |
-| `contracts/src/game/StakeVault.sol` | Stake DRIP, earn buyback rewards (Synthetix-style). | ✅ implemented + tested |
+| `contracts/src/game/DripToken.sol` | **Fixed-supply** ERC-20 (burnable). No mint, no owner. Whole supply → the Pons launch. | ✅ implemented + tested |
+| `contracts/src/game/GridMine.sol` | Rounds, `deploy(tile,amount)`, close, RNG winner, `processRewards` (buy DRIP + split), `harvest`. | ✅ implemented + tested |
+| `contracts/src/game/RefiningVault.sol` | Holds winners' bought DRIP; 10% claim tax redistributed to unclaimed (acc pattern). | ✅ implemented + tested |
+| `contracts/src/game/StakeVault.sol` | Stake DRIP, earn the stakers' slice of each buyback (Synthetix-style). | ✅ implemented + tested |
 | `contracts/src/game/interfaces/`, `mocks/` | Randomness + swap-router interfaces; test mocks. | ✅ |
 | `contracts/script/DeployGame.s.sol` | Wires the whole game for testnet deploy. | ✅ |
 
-Randomness ships behind `IRandomnessSource` (VRF or commit–reveal); the test uses `MockRandomness`.
-v1 **always splits the DRIP emission pro-rata** (no solo-winner — deferred to v2, per the ORE guide).
+The buyback/burn/stakers/motherlode split now lives **inside `GridMine.processRewards`** (a
+permissionless keeper step that swaps the USDG cut → DRIP with a slippage bound), so there's no
+separate `Buyback` contract and no mint token. Randomness is behind `IRandomnessSource` (VRF or
+commit–reveal); tests use `MockRandomness`. v2 splits winner DRIP pro-rata (no solo-winner yet).
 
-## Suggested v1 params (all tunable — `config/constants.example.json` → `gridMine`)
+## Params (all tunable — `config/constants.example.json` → `gridMine`)
 
-| Param | Start |
+| Param | Value |
 |---|---|
 | Grid | 5×5 = 25 tiles |
 | Round | 60 s |
 | Deploy asset | USDG |
-| Protocol cut | 10% of loser pot |
-| Emission | ~1 DRIP / round (from reserve) |
-| Motherlode | +0.2 DRIP / round, 1/625 hit |
+| DRIP supply | fixed (no mint) |
+| Admin fee | 1% of gross → marketing/ops |
+| Protocol cut | 10% of loser pot → buys DRIP |
+| Bought-DRIP split | 70% burn / 10% stakers / 10% winners / 10% motherlode |
+| Motherlode hit | 1/625 |
 | Refining (claim) tax | 10% → unclaimed holders |
-| Buyback split | 90% burn / 10% stakers |
+
+Verified end-to-end against **real USDG** on a Robinhood mainnet fork (`test/game/ForkUSDG.t.sol`).
 
 ## Relationship to the existing reward engine — DECIDE (DECISIONS #8)
 

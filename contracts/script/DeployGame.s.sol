@@ -3,10 +3,9 @@ pragma solidity ^0.8.26;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {DripMineToken} from "../src/game/DripMineToken.sol";
+import {DripToken} from "../src/game/DripToken.sol";
 import {GridMine} from "../src/game/GridMine.sol";
 import {RefiningVault} from "../src/game/RefiningVault.sol";
-import {Buyback} from "../src/game/Buyback.sol";
 import {StakeVault} from "../src/game/StakeVault.sol";
 import {ISwapRouter} from "../src/game/interfaces/ISwapRouter.sol";
 import {IRandomnessSource} from "../src/game/interfaces/IRandomnessSource.sol";
@@ -14,25 +13,26 @@ import {MockERC20} from "../src/game/mocks/MockERC20.sol";
 import {MockRandomness} from "../src/game/mocks/MockRandomness.sol";
 import {MockSwapRouter} from "../src/game/mocks/MockSwapRouter.sol";
 
-/// @notice Deploy + wire the Grid Mine game. TESTNET (46630) ONLY — see docs/BLOCKERS.md #4.
+/// @notice Deploy + wire Grid Mine v2. TESTNET (46630) ONLY — docs/BLOCKERS.md #4.
 ///
-/// Env (all optional on testnet; mocks are deployed when an address is 0):
-///   USDG           - deploy asset (Robinhood USDG 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168)
-///   SWAP_ROUTER    - Uniswap v4 adapter for Buyback (0 => MockSwapRouter)
-///   RANDOMNESS     - IRandomnessSource (VRF/commit-reveal; 0 => MockRandomness)
-///   ADMIN_TREASURY - receives the 1% admin fee (default: broadcaster)
+/// Env (optional on testnet; mocks are deployed when an address is 0):
+///   USDG           - deploy asset (real USDG on mainnet; 0 => mock)
+///   SWAP_ROUTER    - DRIP/USDG swap adapter (real v4 adapter on mainnet; 0 => mock, auto-funded)
+///   RANDOMNESS     - IRandomnessSource (VRF/commit-reveal; 0 => mock)
+///   MARKETING      - receives the 1% admin fee (default: broadcaster)
 ///   FEE_SINK       - refining fee when no unclaimed holders (default: broadcaster)
-///   CAP            - DRIP hard cap in whole tokens (default 3_000_000)
+///   CAP            - DRIP fixed supply in whole tokens (default 3_000_000)
 ///
-/// Usage:
-///   forge script script/DeployGame.s.sol --rpc-url rhc_testnet --broadcast
+/// NOTE: DRIP is FIXED SUPPLY (no mint). On mainnet the whole supply goes to the Pons launch, which
+/// seeds the DRIP/USDG pool the game buys from. Here the deployer holds it; for a mock router we
+/// seed the router with DRIP so buys work in testing.
 contract DeployGame is Script {
     function run() external {
         address deployer = msg.sender;
         address usdg = vm.envOr("USDG", address(0));
         address swapRouter = vm.envOr("SWAP_ROUTER", address(0));
         address randomness = vm.envOr("RANDOMNESS", address(0));
-        address adminTreasury = vm.envOr("ADMIN_TREASURY", deployer);
+        address marketing = vm.envOr("MARKETING", deployer);
         address feeSink = vm.envOr("FEE_SINK", deployer);
         uint256 cap = vm.envOr("CAP", uint256(3_000_000)) * 1 ether;
 
@@ -40,40 +40,38 @@ contract DeployGame is Script {
 
         if (usdg == address(0)) {
             usdg = address(new MockERC20("Global Dollar (mock)", "USDG", 6));
-            console2.log("Deployed MockERC20 USDG:", usdg);
+            console2.log("MockERC20 USDG:", usdg);
         }
-        if (swapRouter == address(0)) {
+        bool mockRouter = swapRouter == address(0);
+        if (mockRouter) {
             swapRouter = address(new MockSwapRouter());
-            console2.log("Deployed MockSwapRouter:", swapRouter);
+            console2.log("MockSwapRouter:", swapRouter);
         }
-        bool usedMockRandomness = randomness == address(0);
-        if (usedMockRandomness) {
+        bool mockRng = randomness == address(0);
+        if (mockRng) {
             randomness = address(new MockRandomness());
-            console2.log("Deployed MockRandomness:", randomness);
+            console2.log("MockRandomness:", randomness);
         }
 
-        DripMineToken drip = new DripMineToken(cap, deployer);
+        DripToken drip = new DripToken(cap, deployer); // fixed supply → deployer (== the Pons launch)
         StakeVault stakeVault = new StakeVault(IERC20(address(drip)));
-        Buyback buyback =
-            new Buyback(IERC20(usdg), IERC20(address(drip)), ISwapRouter(swapRouter), address(stakeVault));
         RefiningVault refining = new RefiningVault(IERC20(address(drip)), feeSink);
         GridMine gridMine = new GridMine(
-            IERC20(usdg), drip, refining, IRandomnessSource(randomness), address(buyback), adminTreasury, deployer
+            IERC20(usdg), IERC20(address(drip)), refining, stakeVault, ISwapRouter(swapRouter),
+            IRandomnessSource(randomness), marketing, deployer
         );
 
-        // Wire the cycle.
         refining.setGridMine(address(gridMine));
-        drip.setMinter(address(gridMine));
-        drip.lockMinter();
-        // Only the mock needs its consumer pointed here; real sources configure their own way.
-        if (usedMockRandomness) MockRandomness(randomness).setConsumer(address(gridMine));
+        if (mockRng) MockRandomness(randomness).setConsumer(address(gridMine));
+        // Seed the MOCK router with DRIP so per-round buys have liquidity in testing. On mainnet the
+        // router is the real Pons/Uniswap-v4 pool — do NOT do this.
+        if (mockRouter) drip.transfer(swapRouter, cap / 10);
 
         vm.stopBroadcast();
 
-        console2.log("DripMineToken:", address(drip));
+        console2.log("DripToken:    ", address(drip));
         console2.log("GridMine:     ", address(gridMine));
         console2.log("RefiningVault:", address(refining));
-        console2.log("Buyback:      ", address(buyback));
         console2.log("StakeVault:   ", address(stakeVault));
     }
 }

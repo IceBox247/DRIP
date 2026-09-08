@@ -82,21 +82,21 @@
     "AAPL": { "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9", "decimals": 18, "note": "Apple stock token" }
   },
   "gridMine": {
-    "$comment": "ORE-style grid game (docs/GRID-MINE.md). OPTIONAL mode, gated by BLOCKERS.md #4 (real-money game of chance = gambling law). All tunable; not final.",
+    "$comment": "ORE-style grid game v2 (docs/GRID-MINE.md). REWARDS ARE BOUGHT, NOT MINTED — DRIP is fixed supply. OPTIONAL mode, gated by BLOCKERS.md #4 (real-money game of chance). All tunable.",
     "tiles": 25,
     "roundSeconds": 60,
     "deployAsset": "USDG",
-    "maxSupply": "3000000",
+    "dripTotalSupply": "3000000",
     "adminFeeBps": 100,
     "loserCutBps": 1000,
-    "emissionPerRound": "1",
-    "motherlodePerRound": "0.2",
+    "cutSplitBurnBps": 7000,
+    "cutSplitStakersBps": 1000,
+    "cutSplitWinnersBps": 1000,
+    "cutSplitMotherlodeBps": 1000,
     "motherlodeOdds": 625,
     "refineFeeBps": 1000,
-    "buybackBurnBps": 9000,
-    "buybackStakersBps": 1000,
     "randomness": "commit-reveal",
-    "emissionsSource": "mint",
-    "$comment_fields": "maxSupply DRIP hard cap (freeze). adminFeeBps 100=1% of gross deploys. loserCutBps 1000=10% of loser pot to protocol/buyback. emission/motherlode are DRIP amounts/round. motherlodeOdds 625 = 1/625. refineFeeBps 1000=10% claim tax to unclaimed. buyback 90/10 burn/stakers. randomness: 'chainlink-vrf' if a coordinator exists on Robinhood Chain (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'mint' (v1: capped DripMineToken, GridMine-only minter, locked) or 'reserve' (pre-funded locked reserve, no mint)."
+    "emissionsSource": "bought",
+    "$comment_fields": "dripTotalSupply = fixed DRIP supply (no mint; whole supply to the Pons launch which seeds DRIP/USDG liquidity). adminFeeBps 100 = 1% of gross deploys -> marketing/ops (taken from the loser stake). loserCutBps 1000 = 10% of the loser pot; that USDG BUYS DRIP, split by cutSplit* (of the bought DRIP): 70% burn / 10% stakers / 10% winners / 10% motherlode. Remaining 90% of the loser pot -> winners in USDG. refineFeeBps 1000 = 10% claim tax to unclaimed holders. motherlodeOdds 625 = 1/625. randomness: 'chainlink-vrf' if a coordinator exists (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'bought' = winner DRIP is bought from the pool, never minted."
   }
 }

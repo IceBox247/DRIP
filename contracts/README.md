@@ -19,21 +19,23 @@ Interfaces live in `src/interfaces/`.
 
 ### `src/game/` — ORE-style Grid Mine (see [`../docs/GRID-MINE.md`](../docs/GRID-MINE.md))
 
-**Implemented v1, compiles + tested (`forge test` → 6 passing).** ⚠️ Gated by
+**Implemented v2, compiles + tested (`forge test` → 7 passing, incl. a real-USDG mainnet-fork round).**
+Rewards are **bought, not minted** — DRIP is fixed supply. ⚠️ Gated by
 [`../docs/BLOCKERS.md`](../docs/BLOCKERS.md) **#4 (gambling / game of chance)** — testnet with test
 funds only until gambling counsel + licensing + geoblock are in place.
 
 | File | Role |
 |---|---|
-| `src/game/DripMineToken.sol` | Capped ERC-20; only GridMine mints (set once + locked); no team allocation. |
-| `src/game/GridMine.sol` | 5×5 grid rounds: deploy → RNG winner → redistribute → `harvest` → emit → protocol cut. |
-| `src/game/RefiningVault.sol` | Holds winners' DRIP; 10% claim tax redistributed to unclaimed holders. |
-| `src/game/Buyback.sol` | Protocol cut → buy DRIP → burn 90%, 10% to stakers. |
-| `src/game/StakeVault.sol` | Stake DRIP, earn buyback rewards (accumulator pattern). |
+| `src/game/DripToken.sol` | **Fixed-supply** ERC-20 (burnable). No mint, no owner. Whole supply → the Pons launch. |
+| `src/game/GridMine.sol` | 5×5 rounds: deploy → RNG winner → `processRewards` (buy DRIP, split 70/10/10/10) → `harvest`. |
+| `src/game/RefiningVault.sol` | Holds winners' bought DRIP; 10% claim tax redistributed to unclaimed holders. |
+| `src/game/StakeVault.sol` | Stake DRIP, earn the stakers' slice of each buyback (accumulator pattern). |
 | `src/game/interfaces/`, `src/game/mocks/` | Randomness + swap-router interfaces; test mocks. |
 
-Randomness is injected via `IRandomnessSource` (Chainlink VRF if a coordinator exists on Robinhood
-Chain, else bonded commit–reveal); tests use `MockRandomness`. The owner can **never** pick the tile.
+Money flow per round: 1% admin → marketing; 90% of the loser pot → winners in USDG; the 10% cut
+**buys DRIP** (via `ISwapRouter` — mock in tests, a Uniswap v4 adapter on mainnet) and splits it
+**70% burn / 10% stakers / 10% winners / 10% motherlode**. Randomness is injected via
+`IRandomnessSource` (VRF or bonded commit–reveal); the owner can **never** pick the tile.
 
 ```bash
 forge test                                             # unit tests

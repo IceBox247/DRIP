@@ -26,15 +26,15 @@ export default function Home() {
                 </div>
 
                 <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
-                  Mine the grid.
+                  Mine the grid for
                   <br />
-                  Win <span className="text-lime">tokenized stock.</span>
+                  <span className="text-lime">USDG &amp; DRIP.</span>
                 </h1>
 
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-mute">
-                  Every 60 seconds, deploy {site.launchpad === "Pons" ? "USDG" : "funds"} onto a 5×5
-                  mine. One tile wins — winners split the pot and mine fresh DRIP; the protocol buys
-                  back and burns. The team holds zero tokens.
+                  Every 60 seconds, deploy USDG onto a 5×5 mine. One tile wins — winners split the
+                  USDG pot, and the protocol buys DRIP for winners, burns most, and feeds stakers.
+                  Nothing is minted; the team holds zero tokens.
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -83,8 +83,8 @@ export default function Home() {
             {[
               { n: "01", title: "Deploy", body: "Stake USDG onto any of the 25 tiles before the 60-second round closes. Spread wide or stack one." },
               { n: "02", title: "One tile wins", body: "A secure on-chain RNG picks the winning tile — 1-in-25. Nobody, not even the team, can pick it." },
-              { n: "03", title: "Winners split + mine", body: "Losers' USDG is redistributed to the winning tile (pro-rata), and the round mints fresh DRIP to winners." },
-              { n: "04", title: "Buyback + refine", body: "The protocol cut buys DRIP and burns 90%. Claim your DRIP anytime — waiting earns you others' 10% refine tax." },
+              { n: "03", title: "Winners split + earn DRIP", body: "Losers' USDG goes to the winning tile (pro-rata). The 10% cut buys DRIP — winners get a share; the rest burns and feeds stakers. Nothing is minted." },
+              { n: "04", title: "Buyback + refine", body: "Most of the bought DRIP is burned; a slice grows the motherlode. Claim your DRIP anytime — waiting earns you others' 10% refine tax." },
             ].map((s) => (
               <div key={s.n} className="rounded-2xl border border-line bg-panel p-6 transition-colors hover:border-mute/40">
                 <div className="text-sm font-semibold text-lime">{s.n}</div>
