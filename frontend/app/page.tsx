@@ -40,7 +40,7 @@ export default function Home() {
                     href={site.links.game}
                     className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
                   >
-                    Play Grid Mine
+                    Mine
                   </Link>
                   <a
                     href={site.links.spec}
@@ -93,7 +93,7 @@ export default function Home() {
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link href={site.links.game} className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02]">
-              Play Grid Mine
+              Mine
             </Link>
             <span className="text-xs text-mute">
               +0.2 DRIP jackpot builds every round · 1-in-625 chance it dumps on the winning tile 🎰
