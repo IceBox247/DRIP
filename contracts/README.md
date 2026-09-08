@@ -17,6 +17,18 @@ Solidity contracts for Drip, laid out as a [Foundry](https://book.getfoundry.sh/
 
 Interfaces live in `src/interfaces/`.
 
+### `src/game/` — optional ORE-style Grid Mine (see [`../docs/GRID-MINE.md`](../docs/GRID-MINE.md))
+
+⚠️ Gated by [`../docs/BLOCKERS.md`](../docs/BLOCKERS.md) **#4 (gambling / game of chance)** — testnet
+with test funds only until gambling counsel + licensing + geoblock are in place.
+
+| File | Role |
+|---|---|
+| `src/game/GridMine.sol` | 5×5 grid rounds: deploy → RNG winner → redistribute → emit → protocol cut. |
+| `src/game/EmissionsReserve.sol` | Pre-funded, locked DRIP paid as round emissions (fixed supply, no mint). |
+| `src/game/RefiningVault.sol` | Holds winners' DRIP; claim tax redistributed to unclaimed holders. |
+| `src/game/Buyback.sol` | Protocol cut → buy DRIP on Uniswap v4 → burn most, rest to stakers. |
+
 ## We do NOT collect the fee — there is no hook
 
 **Pons** collects the trade fee on DRIP, keeps its protocol cut, and pays our creator share **in

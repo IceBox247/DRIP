@@ -81,6 +81,34 @@ public sources conflict and Pons fee params are **immutable once set at launch**
 **economics (fee size vs. the 3% target) are the open risk** and are locked at launch — verify, do
 not assume.
 
+## Blocker 4 — Gambling / games of chance (only if Grid Mine ships)
+
+The optional **Grid Mine** game mode ([GRID-MINE.md](./GRID-MINE.md)) is a **real-money game of
+chance**: players pool stakes onto tiles, an RNG picks a winner, losers' funds are redistributed,
+and there's a 1/625 jackpot. That is **lottery/casino activity**, regulated **separately from and in
+addition to** the securities exposure in #2.
+
+**Why this is severe:**
+
+- Online gambling is licensed or outright prohibited in many jurisdictions; the **US** is
+  especially restrictive (federal + state-by-state). Offering it to US persons is high-risk.
+- Redistributing losers' stakes to winners for a fee, plus a jackpot, is close to the textbook
+  definition of a lottery/betting pool.
+- Stacking it on stock-token rewards means you may face **both** securities **and** gambling regimes
+  at once.
+
+**Required before Grid Mine goes live (not legal advice):**
+
+- [ ] Gambling/gaming counsel in every jurisdiction the app is reachable from.
+- [ ] Licensing where required; structure + geoblock (US persons especially) — reuse the #2 geoblock.
+- [ ] Provably-fair, non-manipulable RNG (VRF or bonded commit–reveal) so it can't be rigged
+      (DECISIONS #9) — a rigged-looking game is both a legal and reputational bomb.
+- [ ] Clear odds disclosure; no "returns"/"yield"/"investment" framing on the game.
+- [ ] Decide whether Grid Mine ships at all vs. the passive reward model (DECISIONS #8).
+
+**Status:** ⛔ Not cleared. Skeletons may exist and be tested on **testnet with test funds only**;
+no mainnet, no real-value play, until gambling counsel + licensing + geoblock are in place.
+
 ## Gate policy
 
 Phase 3 (reward engine) code may be **written and tested on testnet** as scaffolding, but:

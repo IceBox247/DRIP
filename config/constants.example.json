@@ -75,10 +75,26 @@
     "$comment": "Robinhood Chain. EVM, Arbitrum Orbit. chainId verified on-chain (0x1237=4663). Native gas is ETH; USDG is the stablecoin. See docs/ROBINHOOD-CHAIN.md."
   },
   "stockTokens": {
-    "$comment": "Official Robinhood-issued RWA/stock + base tokens on Robinhood Chain mainnet. Addresses + decimals VERIFIED on-chain via symbol()/decimals() eth_call (chainId 4663) on 2026-09-08. Do NOT mint your own stock token — permissioned issuance; you may only trade/LP against these. Confirm the full live list against Robinhood's registry API (https://api.robinhood.com/rhj/ metadata) + Blockscout before use, and re-verify at integration time.",
+    "$comment": "Official Robinhood-issued RWA/stock + base tokens on Robinhood Chain mainnet. Addresses + decimals VERIFIED on-chain via symbol()/decimals() eth_call (chainId 4663) on 2026-09-08. Do NOT mint your own stock token — permissioned issuance; you may only trade/LP against these. Confirm the full live list against Robinhood's registry API (GET https://api.robinhood.com/rhj/assets) + Blockscout before use, and re-verify at integration time.",
     "USDG": { "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", "decimals": 6, "note": "Global Dollar stablecoin — base pair / fee currency" },
     "WETH": { "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", "decimals": 18, "note": "wrapped ETH (gas token)" },
     "NVDA": { "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", "decimals": 18, "note": "Nvidia stock token" },
     "AAPL": { "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9", "decimals": 18, "note": "Apple stock token" }
+  },
+  "gridMine": {
+    "$comment": "ORE-style grid game (docs/GRID-MINE.md). OPTIONAL mode, gated by BLOCKERS.md #4 (real-money game of chance = gambling law). All tunable; not final.",
+    "tiles": 25,
+    "roundSeconds": 60,
+    "deployAsset": "USDG",
+    "loserCutBps": 1000,
+    "emissionPerRound": "1",
+    "motherlodePerRound": "0.2",
+    "motherlodeOdds": 625,
+    "refineFeeBps": 1000,
+    "buybackBurnBps": 9000,
+    "buybackStakersBps": 1000,
+    "randomness": "commit-reveal",
+    "emissionsSource": "reserve",
+    "$comment_fields": "loserCutBps 1000=10% of loser pot to protocol. emission/motherlode are DRIP amounts/round. motherlodeOdds 625 = 1/625. refineFeeBps 1000=10% claim tax to unclaimed. buyback 90/10 burn/stakers. randomness: 'chainlink-vrf' if a coordinator exists on Robinhood Chain (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'reserve' = paid from a pre-funded locked DRIP reserve, NOT minted."
   }
 }

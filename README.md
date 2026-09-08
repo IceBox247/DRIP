@@ -33,8 +33,11 @@ This project sits on top of hard gates. See [`docs/BLOCKERS.md`](./docs/BLOCKERS
 3. **Pons fee economics** — the reward engine is funded by Pons creator fees (USDG). Pons's default
    nets ~0.7% of volume, not 3%; the fee is **locked at launch**. Confirm the on-chain fee params
    and the volume tradeoff before launching.
+4. **Gambling (only if [Grid Mine](./docs/GRID-MINE.md) ships)** — the optional ORE-style grid game
+   is a real-money game of chance, regulated separately from securities. Needs gambling counsel +
+   licensing + geoblock before any real-value play. See [`docs/BLOCKERS.md`](./docs/BLOCKERS.md) #4.
 
-Nothing here should be deployed to mainnet or promoted publicly until these gates clear.
+Nothing here should be deployed to mainnet or promoted publicly until the relevant gates clear.
 
 ---
 
