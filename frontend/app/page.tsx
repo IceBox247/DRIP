@@ -16,14 +16,7 @@ export default function Home() {
           <div className="relative mx-auto max-w-content px-5 pb-16 pt-16 sm:pt-24">
             <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3 py-1 text-xs text-mute">
-                  <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" />
-                  {live
-                    ? `Live on ${site.chain} · via ${site.launchpad}`
-                    : `Pre-launch · fair launch on ${site.chain} · via ${site.launchpad}`}
-                </div>
-
-                <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
+                <h1 className="text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
                   Mine the grid for
                   <br />
                   <span className="text-lime">USDG &amp; DRIP.</span>
