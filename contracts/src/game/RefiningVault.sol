@@ -1,44 +1,111 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-/// @title RefiningVault
-/// @notice Holds winners' accrued DRIP. Claiming costs REFINE_FEE_BPS (ORE ~10%), and that fee is
-///         redistributed to holders who have NOT yet claimed — fast sellers subsidize diamond hands.
-///         See docs/GRID-MINE.md ("Anti-dump: refining").
-///
-/// @dev Skeleton only. Not audited, not for mainnet. The fair redistribution of the claim fee to
-///      remaining unclaimed balances is the tricky part — implement with an accumulator
-///      (reward-per-share) pattern to stay O(1) per claim, not a loop over holders.
-///
-/// TODO(Phase 3):
-///   - credit(account, amount): GridMine credits winners' DRIP here (from EmissionsReserve + pot).
-///   - claim(): transfer balance minus REFINE_FEE_BPS; distribute the fee to unclaimed balances via
-///     an accumulator; checks-effects-interactions + SafeERC20.
-contract RefiningVault {
-    uint16 public constant REFINE_FEE_BPS = 1000; // 10% claim tax → unclaimed holders
-    uint16 public constant BPS_DENOMINATOR = 10_000;
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-    // address public immutable drip;
-    // address public immutable gridMine; // only GridMine may credit
+/// @title RefiningVault
+/// @notice Holds winners' unrefined DRIP. Claiming costs REFINE_FEE_BPS (10%), redistributed to
+///         everyone who has NOT yet claimed — fast sellers subsidize diamond hands (ORE "refining").
+/// @dev Accounting is the MasterChef reward-per-share pattern over unclaimed balances ("shares"):
+///      each claim's fee raises `accTaxPerShare`; a holder's earned tax folds into their claimable
+///      principal on their next interaction. Invariant: sum of every account's claimable == the
+///      DRIP the vault holds (minus any fee routed to `feeSink` when no one is left to receive it).
+contract RefiningVault is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    uint16 public constant REFINE_FEE_BPS = 1000; // 10%
+    uint16 public constant BPS = 10_000;
+    uint256 private constant ACC = 1e18;
+
+    IERC20 public immutable drip;
+    address public gridMine; // only creditor; set once after deploy (GridMine<->vault cycle)
+    address public immutable admin; // may set gridMine exactly once
+    address public feeSink; // receives fee when no unclaimed holders remain (e.g. buyback/burn)
+
+    uint256 public totalShares; // total unclaimed principal
+    uint256 public accTaxPerShare; // 1e18-scaled
+    mapping(address => uint256) public shares; // unclaimed principal (excludes un-folded tax)
+    mapping(address => uint256) public rewardDebt;
 
     event Credited(address indexed account, uint256 amount);
     event Claimed(address indexed account, uint256 net, uint256 fee);
 
-    /// @notice Credit `amount` DRIP to `account` (winner emission/pot). Only GridMine. TODO.
+    error NotGridMine();
+    error InsufficientBalance();
+    error NotAdmin();
+    error GridMineAlreadySet();
+    error ZeroAddress();
+
+    event GridMineSet(address indexed gridMine);
+
+    constructor(IERC20 drip_, address feeSink_) {
+        drip = drip_;
+        admin = msg.sender;
+        feeSink = feeSink_;
+    }
+
+    /// @notice Wire the GridMine contract exactly once (resolves the GridMine<->vault deploy cycle).
+    function setGridMine(address gridMine_) external {
+        if (msg.sender != admin) revert NotAdmin();
+        if (gridMine != address(0)) revert GridMineAlreadySet();
+        if (gridMine_ == address(0)) revert ZeroAddress();
+        gridMine = gridMine_;
+        emit GridMineSet(gridMine_);
+    }
+
+    function _pending(address a) internal view returns (uint256) {
+        return (shares[a] * accTaxPerShare) / ACC - rewardDebt[a];
+    }
+
+    function _fold(address a) internal {
+        uint256 p = _pending(a);
+        if (p > 0) {
+            shares[a] += p;
+            totalShares += p;
+        }
+        rewardDebt[a] = (shares[a] * accTaxPerShare) / ACC;
+    }
+
+    /// @notice Gross claimable (before the refining fee) for `account`.
+    function claimable(address account) external view returns (uint256) {
+        return shares[account] + _pending(account);
+    }
+
+    /// @notice Credit unrefined DRIP to a winner. Only GridMine (which must have transferred/minted
+    ///         the DRIP to this vault first).
     function credit(address account, uint256 amount) external {
-        account;
-        amount;
-        revert("RefiningVault: not implemented");
+        if (msg.sender != gridMine) revert NotGridMine();
+        if (amount == 0) return;
+        _fold(account);
+        shares[account] += amount;
+        totalShares += amount;
+        rewardDebt[account] = (shares[account] * accTaxPerShare) / ACC;
+        emit Credited(account, amount);
     }
 
-    /// @notice Claim your accrued DRIP, paying the refining fee to unclaimed holders. TODO.
-    function claim() external {
-        revert("RefiningVault: not implemented");
-    }
+    /// @notice Claim `amount` of your unrefined DRIP, paying the 10% refining fee to remaining
+    ///         unclaimed holders.
+    function claim(uint256 amount) external nonReentrant {
+        _fold(msg.sender);
+        if (amount == 0 || amount > shares[msg.sender]) revert InsufficientBalance();
 
-    /// @notice Claimable (gross) balance for `account`, before the refining fee.
-    function balanceOf(address account) external view returns (uint256) {
-        account;
-        return 0;
+        shares[msg.sender] -= amount;
+        totalShares -= amount;
+        rewardDebt[msg.sender] = (shares[msg.sender] * accTaxPerShare) / ACC;
+
+        uint256 fee = (amount * REFINE_FEE_BPS) / BPS;
+        uint256 net = amount - fee;
+
+        if (fee > 0) {
+            if (totalShares > 0) {
+                accTaxPerShare += (fee * ACC) / totalShares;
+            } else {
+                drip.safeTransfer(feeSink, fee); // no one left to receive it
+            }
+        }
+        drip.safeTransfer(msg.sender, net);
+        emit Claimed(msg.sender, net, fee);
     }
 }

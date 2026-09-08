@@ -7,7 +7,7 @@ script = "script"
 solc_version = "0.8.26"
 optimizer = true
 optimizer_runs = 200
-# via_ir = true  # enable if a dependency needs it
+via_ir = true  # required: Uniswap v4 integration + deploy script hit "stack too deep" without it
 
 # Robinhood Chain RPCs — fill in real endpoints before use.
 [rpc_endpoints]

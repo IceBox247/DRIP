@@ -31,17 +31,20 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
 Spreading across tiles = win often, small. Stacking one tile = rare, fat. Rounds stay ~1 minute —
 that cadence is the product.
 
-## Emissions — reserve, not mint (the key adaptation)
+## Emissions — mint model (shipped v1) vs reserve model
 
-ORE mints 1 token/round. DRIP is a **fixed-supply, fair-launch** token (Pons may deploy it, no mint
-backdoor — SPEC §1, DECISIONS #6). Minting per round would require an owner/contract mint hook, which
-breaks the fair-launch story.
+Two ways to pay the ~1 DRIP/round emission:
 
-**So emissions come from a pre-funded, locked `EmissionsReserve`** seeded once at launch with the
-DRIP allocated to game rewards. `GridMine` pays winners from that reserve at ~1 DRIP/round until it
-runs dry. Same cadence and feel as ORE, but **fixed supply and Pons-compatible, no mint authority.**
-(If we later decide DRIP should be a capped *mintable* token we deploy ourselves, `GridMine` could
-mint instead — but that's DECISIONS #6 + #8 and costs the no-backdoor credibility.)
+- **Mint model (shipped v1 — `contracts/src/game/`):** `DripMineToken` is a **capped** ERC-20 whose
+  **only minter is GridMine**, set once then **locked** (`lockMinter()`), no team allocation. GridMine
+  mints the round emission to winners up to the hard cap. This is ORE's model, ported.
+- **Reserve model (alternative):** pre-mint the whole cap to a **locked reserve** and have GridMine
+  *pay* from it instead of minting. Keeps a strictly fixed supply with no mint authority at all —
+  better if DRIP must be a Pons fixed-supply fair launch (SPEC §1, DECISIONS #6/#8).
+
+v1 ships the mint model because it matches ORE and is simplest; the cap + locked-minter + zero team
+allocation keep it credible. Switching to the reserve model later is a localized change (swap the
+`drip.mint(...)` call in `GridMine.harvest` for a `reserve.release(...)`).
 
 ## Anti-dump: refining (claim tax)
 
@@ -84,13 +87,18 @@ if winners receive stock; paying winners in the same deploy asset is simplest. D
 
 ## Contracts
 
-| File | Role |
-|---|---|
-| `contracts/src/game/GridMine.sol` | Rounds, `deploy(tile,amount)`, close, RNG winner, payout, protocol cut. |
-| `contracts/src/game/RefiningVault.sol` | Holds winners' DRIP; claim tax redistributed to unclaimed. |
-| `contracts/src/game/Buyback.sol` | Protocol cut → swap to DRIP → burn most, rest to stakers. |
-| `contracts/src/game/EmissionsReserve.sol` | Pre-funded, locked DRIP that GridMine pays emissions from (no mint). |
-| `DripToken.sol` | Unchanged: fixed-supply ERC-20. Game rewards come from the reserve, not new mint. |
+| File | Role | Status |
+|---|---|---|
+| `contracts/src/game/DripMineToken.sol` | Capped ERC-20; only GridMine mints (set once + locked); no team. | ✅ implemented + tested |
+| `contracts/src/game/GridMine.sol` | Rounds, `deploy(tile,amount)`, close, RNG winner, `harvest` payout, protocol cut. | ✅ implemented + tested |
+| `contracts/src/game/RefiningVault.sol` | Holds winners' DRIP; 10% claim tax redistributed to unclaimed (acc pattern). | ✅ implemented + tested |
+| `contracts/src/game/Buyback.sol` | Protocol cut → swap to DRIP → burn 90%, 10% to stakers. | ✅ implemented + tested |
+| `contracts/src/game/StakeVault.sol` | Stake DRIP, earn buyback rewards (Synthetix-style). | ✅ implemented + tested |
+| `contracts/src/game/interfaces/`, `mocks/` | Randomness + swap-router interfaces; test mocks. | ✅ |
+| `contracts/script/DeployGame.s.sol` | Wires the whole game for testnet deploy. | ✅ |
+
+Randomness ships behind `IRandomnessSource` (VRF or commit–reveal); the test uses `MockRandomness`.
+v1 **always splits the DRIP emission pro-rata** (no solo-winner — deferred to v2, per the ORE guide).
 
 ## Suggested v1 params (all tunable — `config/constants.example.json` → `gridMine`)
 

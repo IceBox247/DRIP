@@ -17,17 +17,31 @@ Solidity contracts for Drip, laid out as a [Foundry](https://book.getfoundry.sh/
 
 Interfaces live in `src/interfaces/`.
 
-### `src/game/` — optional ORE-style Grid Mine (see [`../docs/GRID-MINE.md`](../docs/GRID-MINE.md))
+### `src/game/` — ORE-style Grid Mine (see [`../docs/GRID-MINE.md`](../docs/GRID-MINE.md))
 
-⚠️ Gated by [`../docs/BLOCKERS.md`](../docs/BLOCKERS.md) **#4 (gambling / game of chance)** — testnet
-with test funds only until gambling counsel + licensing + geoblock are in place.
+**Implemented v1, compiles + tested (`forge test` → 6 passing).** ⚠️ Gated by
+[`../docs/BLOCKERS.md`](../docs/BLOCKERS.md) **#4 (gambling / game of chance)** — testnet with test
+funds only until gambling counsel + licensing + geoblock are in place.
 
 | File | Role |
 |---|---|
-| `src/game/GridMine.sol` | 5×5 grid rounds: deploy → RNG winner → redistribute → emit → protocol cut. |
-| `src/game/EmissionsReserve.sol` | Pre-funded, locked DRIP paid as round emissions (fixed supply, no mint). |
-| `src/game/RefiningVault.sol` | Holds winners' DRIP; claim tax redistributed to unclaimed holders. |
-| `src/game/Buyback.sol` | Protocol cut → buy DRIP on Uniswap v4 → burn most, rest to stakers. |
+| `src/game/DripMineToken.sol` | Capped ERC-20; only GridMine mints (set once + locked); no team allocation. |
+| `src/game/GridMine.sol` | 5×5 grid rounds: deploy → RNG winner → redistribute → `harvest` → emit → protocol cut. |
+| `src/game/RefiningVault.sol` | Holds winners' DRIP; 10% claim tax redistributed to unclaimed holders. |
+| `src/game/Buyback.sol` | Protocol cut → buy DRIP → burn 90%, 10% to stakers. |
+| `src/game/StakeVault.sol` | Stake DRIP, earn buyback rewards (accumulator pattern). |
+| `src/game/interfaces/`, `src/game/mocks/` | Randomness + swap-router interfaces; test mocks. |
+
+Randomness is injected via `IRandomnessSource` (Chainlink VRF if a coordinator exists on Robinhood
+Chain, else bonded commit–reveal); tests use `MockRandomness`. The owner can **never** pick the tile.
+
+```bash
+forge test                                             # unit tests
+forge script script/DeployGame.s.sol --rpc-url rhc_testnet --broadcast   # testnet 46630 only
+```
+
+> Build note: `via_ir = true` is enabled in `foundry.toml` (Uniswap v4 + the deploy script otherwise
+> hit "stack too deep").
 
 ## We do NOT collect the fee — there is no hook
 

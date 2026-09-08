@@ -86,6 +86,8 @@
     "tiles": 25,
     "roundSeconds": 60,
     "deployAsset": "USDG",
+    "maxSupply": "3000000",
+    "adminFeeBps": 100,
     "loserCutBps": 1000,
     "emissionPerRound": "1",
     "motherlodePerRound": "0.2",
@@ -94,7 +96,7 @@
     "buybackBurnBps": 9000,
     "buybackStakersBps": 1000,
     "randomness": "commit-reveal",
-    "emissionsSource": "reserve",
-    "$comment_fields": "loserCutBps 1000=10% of loser pot to protocol. emission/motherlode are DRIP amounts/round. motherlodeOdds 625 = 1/625. refineFeeBps 1000=10% claim tax to unclaimed. buyback 90/10 burn/stakers. randomness: 'chainlink-vrf' if a coordinator exists on Robinhood Chain (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'reserve' = paid from a pre-funded locked DRIP reserve, NOT minted."
+    "emissionsSource": "mint",
+    "$comment_fields": "maxSupply DRIP hard cap (freeze). adminFeeBps 100=1% of gross deploys. loserCutBps 1000=10% of loser pot to protocol/buyback. emission/motherlode are DRIP amounts/round. motherlodeOdds 625 = 1/625. refineFeeBps 1000=10% claim tax to unclaimed. buyback 90/10 burn/stakers. randomness: 'chainlink-vrf' if a coordinator exists on Robinhood Chain (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'mint' (v1: capped DripMineToken, GridMine-only minter, locked) or 'reserve' (pre-funded locked reserve, no mint)."
   }
 }
