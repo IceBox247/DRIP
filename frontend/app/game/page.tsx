@@ -33,6 +33,9 @@ export default function GamePage() {
   const [claimed, setClaimed] = useState(0);
   const [motherlode, setMotherlode] = useState(0.4);
   const [protocolCutTotal, setProtocolCutTotal] = useState(0);
+  const [adminFees, setAdminFees] = useState(0); // 1% entry fees → marketing (demo)
+  const [staked, setStaked] = useState(0); // DRIP staked to earn the stakers' slice
+  const [stakeEarned, setStakeEarned] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [result, setResult] = useState<null | {
     tile: number;
@@ -50,8 +53,12 @@ export default function GamePage() {
   const deploy = useCallback(
     (i: number) => {
       if (result || amount <= 0 || amount > usdg) return;
+      // 1% entry fee is skimmed BEFORE funds hit the grid, so it never touches wins/losses.
+      const admin = (amount * gridMine.adminFeeBps) / 10000;
+      const net = Math.round((amount - admin) * 100) / 100;
       setUsdg((u) => Math.round((u - amount) * 100) / 100);
-      setTiles((ts) => ts.map((t, j) => (j === i ? { ...t, mine: t.mine + amount } : t)));
+      setAdminFees((a) => Math.round((a + admin) * 100) / 100);
+      setTiles((ts) => ts.map((t, j) => (j === i ? { ...t, mine: t.mine + net } : t)));
     },
     [amount, usdg, result],
   );
@@ -61,24 +68,25 @@ export default function GamePage() {
     const tile = Math.floor(Math.random() * N);
     const winnerStake = tiles[tile].mine + tiles[tile].others;
     const mine = tiles[tile].mine;
+    // Pool is already net (1% was skimmed at deploy) — no admin here.
     const loserStake = gross - winnerStake;
-    const admin = Math.min((gross * gridMine.adminFeeBps) / 10000, loserStake);
-    const remainingLoser = loserStake - admin;
 
     let usdgDelta = 0;
     let drip = 0;
     let solo = false;
     let soloYou = false;
     let motherlodeHit = false;
-    let cut = remainingLoser;
+    let cut = loserStake;
 
     if (winnerStake > 0) {
-      cut = (remainingLoser * gridMine.loserCutBps) / 10000;
-      const winnerPot = remainingLoser - cut;
+      cut = (loserStake * gridMine.loserCutBps) / 10000;
+      const winnerPot = loserStake - cut;
       if (mine > 0) usdgDelta = mine + (winnerPot * mine) / winnerStake; // USDG always pro-rata
 
-      // The cut "buys DRIP"; winners' slice is 10% of it (demo: 1 unit of USDG ~ 1 DRIP).
+      // The cut "buys DRIP"; slices (demo: 1 USDG ~ 1 DRIP).
       const winnersDrip = (cut * gridMine.cutSplitWinnersBps) / 10000;
+      const stakersDrip = (cut * gridMine.cutSplitStakersBps) / 10000;
+      if (staked > 0) setStakeEarned((e) => Math.round((e + stakersDrip) * 1e6) / 1e6);
       const motherAdd = (cut * gridMine.cutSplitMotherlodeBps) / 10000;
       let pool = winnersDrip;
       const next = motherlode + motherAdd;
@@ -106,7 +114,19 @@ export default function GamePage() {
     setProtocolCutTotal((p) => Math.round((p + cut) * 100) / 100);
     setResult({ tile, won: usdgDelta > 0, usdgDelta, drip, solo, soloYou, motherlodeHit });
     setHistory((h) => [{ round, tile, won: usdgDelta > 0 }, ...h].slice(0, 8));
-  }, [tiles, motherlode, round]);
+  }, [tiles, motherlode, round, staked]);
+
+  const stakeAll = useCallback(() => {
+    if (claimed <= 0) return;
+    setStaked((s) => Math.round((s + claimed) * 1e6) / 1e6);
+    setClaimed(0);
+  }, [claimed]);
+
+  const claimStakeRewards = useCallback(() => {
+    if (stakeEarned <= 0) return;
+    setClaimed((c) => Math.round((c + stakeEarned) * 1e6) / 1e6);
+    setStakeEarned(0);
+  }, [stakeEarned]);
 
   const nextRound = useCallback(() => {
     setRound((r) => r + 1);
@@ -284,7 +304,37 @@ export default function GamePage() {
               </button>
               <div className="mt-2 text-xs text-mute">Claimed to wallet: {fmt(claimed, 4)} DRIP</div>
             </div>
+            {/* Stake to earn */}
+            <div className="rounded-2xl border border-line bg-panel p-5">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-mute">Staked DRIP</div>
+                <span className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-medium text-lime">
+                  stake to earn
+                </span>
+              </div>
+              <div className="mt-1 text-2xl font-semibold text-white">{fmt(staked, 4)}</div>
+              <div className="mt-1 text-xs text-mute">
+                Earned: {fmt(stakeEarned, 4)} DRIP · from the 10% stakers' slice of each buyback
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={stakeAll}
+                  disabled={claimed <= 0}
+                  className="flex-1 rounded-lg bg-lime px-3 py-2 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60"
+                >
+                  Stake wallet DRIP
+                </button>
+                <button
+                  onClick={claimStakeRewards}
+                  disabled={stakeEarned <= 0}
+                  className="rounded-lg border border-line bg-ink px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:text-mute/50"
+                >
+                  Claim
+                </button>
+              </div>
+            </div>
             <Stat label="Motherlode 🎰" value={`${fmt(motherlode, 2)} DRIP`} sub="1 / 625 per round" />
+            <Stat label="Entry fees (1%)" value={`${fmt(adminFees)} ${gridMine.deployAsset}`} sub="skimmed at deploy → marketing" />
             <Stat label="Protocol cut → buyback" value={`${fmt(protocolCutTotal)} ${gridMine.deployAsset}`} sub={`buys DRIP, burns ${gridMine.cutSplitBurnBps / 100}%`} />
             <div className="rounded-2xl border border-line bg-panel p-5">
               <div className="mb-2 text-sm text-mute">Recent winners</div>

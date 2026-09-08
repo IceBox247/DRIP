@@ -80,6 +80,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
 
     uint256 public currentRound;
     uint256 public motherlodeDrip; // DRIP jackpot pool (bought, not minted)
+    uint256 public adminAccrued; // 1% entry fees skimmed at deploy, awaiting withdrawal to marketing
     bool public paused;
 
     mapping(uint256 => Round) public rounds;
@@ -92,7 +93,8 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     event RoundOpened(uint256 indexed round, uint256 startTime);
     event Deployed(uint256 indexed round, address indexed player, uint8 tile, uint256 amount);
     event RoundClosed(uint256 indexed round);
-    event Settled(uint256 indexed round, uint8 winningTile, uint256 winnerPotUsdg, uint256 cutUsdg, uint256 admin, bool motherlodeHit);
+    event Settled(uint256 indexed round, uint8 winningTile, uint256 winnerPotUsdg, uint256 cutUsdg, bool motherlodeHit);
+    event MarketingWithdrawn(uint256 amount);
     event RewardsProcessed(uint256 indexed round, uint256 usdgIn, uint256 dripBought, uint256 burned, uint256 toStakers, uint256 toWinners);
     event HarvestedUsdg(uint256 indexed round, address indexed player, uint256 usdgOut);
     event HarvestedDrip(uint256 indexed round, address indexed player, uint256 dripOut);
@@ -142,11 +144,17 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         if (r.status != Status.Open) revert RoundNotOpen();
         if (block.timestamp >= r.startTime + ROUND_SECONDS) revert WindowClosed();
         usdg.safeTransferFrom(msg.sender, address(this), amount);
-        tileTotal[currentRound][tile] += amount;
-        stakeOf[currentRound][tile][msg.sender] += amount;
+        // 1% entry fee is skimmed HERE, before funds enter the pool, so it never touches the
+        // win/loss math. Only the net 99% is staked. Accrued admin is withdrawn separately and is
+        // NOT part of any round's pot.
+        uint256 admin = (amount * ADMIN_BPS) / BPS;
+        uint256 net = amount - admin;
+        adminAccrued += admin;
+        tileTotal[currentRound][tile] += net;
+        stakeOf[currentRound][tile][msg.sender] += net;
         _segs[currentRound][tile].push(Seg(msg.sender, tileTotal[currentRound][tile]));
-        r.totalIn += amount;
-        emit Deployed(currentRound, msg.sender, tile, amount);
+        r.totalIn += net;
+        emit Deployed(currentRound, msg.sender, tile, net);
     }
 
     function closeRound() external nonReentrant {
@@ -177,22 +185,18 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         r.winningTile = tile;
         r.status = Status.Settled;
 
-        uint256 gross = r.totalIn;
+        // The 1% entry fee was already skimmed at deploy — the pool (totalIn) is pure net stake, so
+        // wins/losses are computed with no admin interference.
+        uint256 pool = r.totalIn;
         uint256 winnerStake = tileTotal[round][tile];
-        uint256 loserStake = gross - winnerStake; // gross >= winnerStake, never underflows
-
-        // Admin (1% of gross) and everything else come out of the LOSER stake only — winners always
-        // get their full principal back. Cap admin at the loser stake so it can never dip into it.
-        uint256 admin = (gross * ADMIN_BPS) / BPS;
-        if (admin > loserStake) admin = loserStake;
-        uint256 remainingLoser = loserStake - admin;
 
         if (winnerStake == 0) {
-            r.cutUsdg = remainingLoser; // no winners → whole remaining pot is burned in processRewards
+            r.cutUsdg = pool; // no winners → whole pool is burned in processRewards
         } else {
-            uint256 cut = (remainingLoser * CUT_BPS) / BPS;
+            uint256 loserPot = pool - winnerStake; // losers' net stake
+            uint256 cut = (loserPot * CUT_BPS) / BPS;
             r.winnerStake = winnerStake;
-            r.winnerPotUsdg = remainingLoser - cut;
+            r.winnerPotUsdg = loserPot - cut;
             r.cutUsdg = cut;
             r.motherlodeHit = ((word >> 8) % MOTHERLODE_ODDS) == 0;
             // 1-or-all: 50% one weighted winner takes the DRIP, 50% shared pro-rata (ORE mechanic).
@@ -203,8 +207,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
             }
         }
 
-        if (admin > 0) usdg.safeTransfer(marketing, admin);
-        emit Settled(round, tile, r.winnerPotUsdg, r.cutUsdg, admin, r.motherlodeHit);
+        emit Settled(round, tile, r.winnerPotUsdg, r.cutUsdg, r.motherlodeHit);
     }
 
     /// @notice Buy DRIP with the round's 10% cut and distribute it (burn/stakers/winners/motherlode).
@@ -291,6 +294,16 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     function setPaused(bool p) external onlyOwner {
         paused = p;
         emit PausedSet(p);
+    }
+
+    /// @notice Send accrued 1% entry fees to the marketing/ops wallet. Permissionless — the funds
+    ///         can only ever go to the fixed `marketing` address, never to the caller.
+    function withdrawMarketing() external nonReentrant {
+        uint256 amt = adminAccrued;
+        if (amt == 0) return;
+        adminAccrued = 0;
+        usdg.safeTransfer(marketing, amt);
+        emit MarketingWithdrawn(amt);
     }
 
     function timeLeft() external view returns (uint256) {

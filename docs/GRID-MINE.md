@@ -20,8 +20,9 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
    onto one or more tiles.
 3. Round closes. A **secure RNG** picks one winning tile (each tile 1/25 = 4%).
 4. **Loser pot** = stake on the 24 losing tiles.
-5. **Admin fee** = 1% of gross deploys → marketing/ops (taken from the loser stake, never from
-   winners' returned principal).
+5. **Entry fee** = 1% of each deploy, **skimmed at deploy time before the funds enter the pool** →
+   marketing/ops. Because it's taken up front, it never touches the win/loss math: the grid only
+   ever holds the net 99%. (Accrues in the contract; `withdrawMarketing()` sends it to the wallet.)
 6. **Protocol cut** = 10% of the loser pot (USDG). The rest of the loser pot (90%) is the **winner
    pot**, split among the winning tile **pro-rata by stake**, paid in **USDG**.
 7. The 10% cut **buys DRIP** from the DRIP/USDG pool (Pons seeds it at launch), and the bought DRIP
@@ -35,9 +36,16 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
 10. **Refining:** winners' DRIP accrues in `RefiningVault`; claiming costs 10% → to holders who
     haven't claimed.
 
-**Edge case — a lone player who covers the winning tile:** the loser pot is 0, so there's **no admin
-fee, no cut, no DRIP bought** — they simply get their USDG back. You can't win from yourself. (A lone
-player only loses if the RNG lands on a tile they didn't cover.)
+**Edge case — a lone player who covers the winning tile:** the loser pot is 0, so there's **no cut
+and no DRIP bought** — they get their **net stake back** (the only cost is the flat 1% entry fee paid
+at deploy). You can't win from yourself. (A lone player only loses their stake if the RNG lands on a
+tile they didn't cover.)
+
+## Stake to earn
+
+`StakeVault` lets DRIP holders **stake and earn the 10% stakers' slice of every buyback** (Synthetix
+accumulator). It's the holder sink that discourages dumping the DRIP won each round — bought DRIP
+flows back to the people who hold and stake.
 
 Spreading across tiles = win often, small. Stacking one tile = rare, fat. Rounds stay ~1 minute —
 that cadence is the product.

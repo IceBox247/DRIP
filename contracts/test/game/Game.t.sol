@@ -70,33 +70,35 @@ contract GameTest is Test {
         vm.warp(block.timestamp + 61);
         gridMine.closeRound(); // settles round 1
 
-        // USDG: gross 450, admin 1% = 4.5 → marketing; winnerStake 200; loserPot 245.5;
-        // cut 24.55 (to swap); winnerPot 220.95.
-        assertEq(usdg.balanceOf(marketing), 45 * U / 10, "marketing 4.5 USDG");
+        // 1% entry fee skimmed at deploy: gross deployed 450 → adminAccrued 4.5, net pool 445.5.
+        // winnerStake (net) 198; loserPot 247.5; cut 24.75; winnerPot 222.75.
+        assertEq(gridMine.adminAccrued(), 45 * U / 10, "1% entry fees accrued = 4.5 USDG");
+        gridMine.withdrawMarketing();
+        assertEq(usdg.balanceOf(marketing), 45 * U / 10, "marketing receives 4.5 USDG");
         GridMine.Round memory r = gridMine.getRound(1);
         assertEq(r.winningTile, 7);
-        assertEq(r.cutUsdg, 2455 * U / 100, "cut 24.55 USDG parked");
+        assertEq(r.cutUsdg, 2475 * U / 100, "cut 24.75 USDG parked");
 
         // Buy DRIP with the cut + distribute (keeper step).
         uint256 supplyBefore = drip.totalSupply();
         gridMine.processRewards(1, 0);
 
-        // 24.55 USDG → 24.55 DRIP. Split: 70% burn=17.185, 10% stakers=2.455, 10% winners=2.455,
-        // 10% motherlode=2.455.
-        assertEq(drip.balanceOf(address(stakeVault)), 2455 * 1e15, "stakers 2.455 DRIP");
-        assertEq(gridMine.motherlodeDrip(), 2455 * 1e15, "motherlode 2.455 DRIP");
-        assertEq(supplyBefore - drip.totalSupply(), 17185 * 1e15, "burned 17.185 DRIP");
+        // 24.75 USDG → 24.75 DRIP. Split: 70% burn=17.325, 10% stakers=2.475, 10% winners=2.475,
+        // 10% motherlode=2.475.
+        assertEq(drip.balanceOf(address(stakeVault)), 2475 * 1e15, "stakers 2.475 DRIP");
+        assertEq(gridMine.motherlodeDrip(), 2475 * 1e15, "motherlode 2.475 DRIP");
+        assertEq(supplyBefore - drip.totalSupply(), 17325 * 1e15, "burned 17.325 DRIP");
 
         // Harvest USDG then DRIP.
         uint256 aBefore = usdg.balanceOf(alice);
         vm.prank(alice);
         gridMine.harvest(1); // pays USDG + credits DRIP (rewards already processed)
-        assertEq(usdg.balanceOf(alice) - aBefore, 210475 * U / 1000, "alice USDG 210.475");
-        assertEq(refining.claimable(alice), 12275 * 1e14, "alice DRIP 1.2275 (half of 2.455)");
+        assertEq(usdg.balanceOf(alice) - aBefore, 210375 * U / 1000, "alice USDG 210.375 (net principal + pot)");
+        assertEq(refining.claimable(alice), 12375 * 1e14, "alice DRIP 1.2375 (half of 2.475)");
 
         vm.prank(bob);
         gridMine.harvest(1);
-        assertEq(refining.claimable(bob), 12275 * 1e14, "bob DRIP 1.2275");
+        assertEq(refining.claimable(bob), 12375 * 1e14, "bob DRIP 1.2375");
     }
 
     function test_soloWinnerTakesAllDrip() public {
@@ -124,26 +126,27 @@ contract GameTest is Test {
         vm.prank(bob);
         gridMine.harvest(1);
 
-        // DRIP: alice gets it all (2.455), bob gets none. USDG pot still shared (both staked 100).
-        assertEq(refining.claimable(alice), 2455 * 1e15, "alice takes all DRIP");
+        // DRIP: alice gets it all (2.475), bob none. USDG pot still shared (both staked net 99).
+        assertEq(refining.claimable(alice), 2475 * 1e15, "alice takes all DRIP");
         assertEq(refining.claimable(bob), 0, "bob gets no DRIP in solo mode");
-        assertEq(usdg.balanceOf(bob), (1000 - 300) * U + 210475 * U / 1000, "bob still gets USDG pot share");
+        assertEq(usdg.balanceOf(bob), (1000 - 300) * U + 210375 * U / 1000, "bob still gets USDG pot share");
     }
 
     function test_soloPlayerWinsPrincipalBack() public {
-        // Only alice plays and covers the winning tile → loser pot is 0 → no fee, no cut, no DRIP.
-        // She simply gets her USDG back. (Answers: "I'm the only one and I picked the winning block.")
+        // Only alice plays and covers the winning tile → loser pot is 0 → no cut, no DRIP, no
+        // win/loss. She gets her NET stake back; the only cost is the flat 1% entry fee taken at
+        // deploy. (Answers: "I'm the only one and I picked the winning block.")
         vm.prank(alice);
-        gridMine.deploy(7, 100 * U);
+        gridMine.deploy(7, 100 * U); // 1 USDG entry fee, 99 into the pool
         rand.setWord(65557); // tile 7
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();
         gridMine.processRewards(1, 0);
         vm.prank(alice);
         gridMine.harvest(1);
-        assertEq(usdg.balanceOf(alice), 1000 * U, "alone + won: exact principal back, zero fees");
+        assertEq(usdg.balanceOf(alice), 999 * U, "alone + won: net stake back (only the 1% entry fee)");
         assertEq(refining.claimable(alice), 0, "no DRIP (nothing was bought)");
-        assertEq(usdg.balanceOf(marketing), 0, "no admin fee (no loser stake to take it from)");
+        assertEq(gridMine.adminAccrued(), 1 * U, "1% entry fee (1 USDG) accrued to marketing");
     }
 
     function test_nothingIsMinted() public {

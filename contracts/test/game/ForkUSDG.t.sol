@@ -76,12 +76,14 @@ contract ForkUSDGTest is Test {
         gridMine.closeRound();
         gridMine.processRewards(1, 0);
 
+        assertEq(gridMine.adminAccrued(), 45 * U / 10, "1% entry fees = 4.5 real USDG");
+        gridMine.withdrawMarketing();
         assertEq(IERC20(USDG).balanceOf(marketing), 45 * U / 10, "marketing 4.5 real USDG");
         uint256 aBefore = IERC20(USDG).balanceOf(alice);
         vm.prank(alice);
         gridMine.harvest(1);
-        assertEq(IERC20(USDG).balanceOf(alice) - aBefore, 210475 * U / 1000, "alice 210.475 real USDG");
-        assertEq(refining.claimable(alice), 12275 * 1e14, "alice DRIP 1.2275 (bought, not minted)");
+        assertEq(IERC20(USDG).balanceOf(alice) - aBefore, 210375 * U / 1000, "alice 210.375 real USDG");
+        assertEq(refining.claimable(alice), 12375 * 1e14, "alice DRIP 1.2375 (bought, not minted)");
         emit log_named_uint("alice real-USDG payout (6dp)", IERC20(USDG).balanceOf(alice) - aBefore);
     }
 }
