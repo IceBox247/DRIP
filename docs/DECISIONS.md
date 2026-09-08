@@ -8,10 +8,10 @@ that contradicts an unresolved decision here.
 |---|---|---|---|---|
 | 1 | **Ops funding** — does the marketing 1% double as ops treasury, or add a dedicated ops slice? Servers, audit (5-figure), legal, and X API all cost money and the team holds no tokens. | Marketing 1% doubles as ops | ❓ Open | — |
 | 2 | **Points unit name** — the in-app earning unit ("hash/points") needs a canonical name for UI + code. | `points` (placeholder) | ❓ Open | — |
-| 3 | **Which Stock Token(s)** does the 2% auto-buy purchase — one liquid ETF-style token, or a basket? | Single liquid ETF-style token | ❓ Open | — |
+| 3 | **Which Stock Token(s)** does the auto-buy purchase (with our netted ETH) — one liquid ETF-style token, or a basket? | Single liquid ETF-style token | ❓ Open | — |
 | 4 | **Referral depth** — single-level or multi-level? | Single level | ❓ Open | — |
-| 5 | **Launchpad fee delivery** — (a) push (launchpad sends our share to a wallet we designate) vs. pull (we withdraw from the launchpad fee wallet); (b) do we receive net 3% or gross 4%? | Push to our wallet; net 3% | ❓ Open | — |
-| 6 | **Who deploys DRIP** — launchpad deploys it as part of fair launch, or we deploy a plain ERC-20 and list it? | Confirm with launchpad | ❓ Open | — |
+| 5 | **Pons fee config** — total trade fee, creator/protocol split, currency, delivery. | Net ~3% to creator, ETH, push via Pons automation | 🔬 Decided-pending-verify | Launchpad = **Pons**. Deliver creator fees in **ETH** to our payout wallet via **push** automation; **net** (Pons keeps its cut). Target **~3% of volume net** to creator → needs a high per-launch fee (default nets ~0.7%). Verify on-chain params (immutable at launch) + volume impact. |
+| 6 | **Who deploys DRIP** — Pons deploys it as part of the launch, or we deploy a plain ERC-20 and list it? | Confirm with Pons | ❓ Open | — |
 
 ## Notes
 
@@ -23,11 +23,13 @@ that contradicts an unresolved decision here.
   the chosen token is freely transferable to arbitrary wallets *before* locking it in.
 - **#4 Referral depth.** Multi-level increases Ponzi-optics and legal risk (see BLOCKERS #2). The
   default (single level) is the conservative choice; changing it needs legal sign-off.
-- **#5 Launchpad fee delivery.** This determines the fee-source adapter (ARCHITECTURE.md) and
-  whether the keeper needs privileged withdraw keys (pull mode) or just reads a wallet (push mode).
-  It also fixes whether `FeeDistributor` forwards 1% to the launchpad (gross) or not (net). Confirm
-  with the launchpad before Phase 1 — it is now a dependency (see BLOCKERS #3).
-- **#6 Who deploys DRIP.** If the launchpad deploys the token, `contracts/src/DripToken.sol` becomes
-  a reference rather than a deployed artifact, and Phase 1 shrinks to the fee-distribution path.
+- **#5 Pons fee config.** ⚠️ The big one. Pons's default is ~1% total / ~70% creator (~0.7% of
+  volume) — **not** 3%. Netting ~3% requires configuring a high total trade fee at launch (~4.3%+),
+  which is **locked forever** and suppresses volume. Before committing: confirm on-chain that Pons
+  allows a fee this high, read the exact per-launch split, confirm the currency (ETH assumed), and
+  model the volume hit. Delivery is **push** (Pons automation → payout wallet), so the keeper needs
+  no privileged keys and `FeeDistributor` never forwards anything back (net). See BLOCKERS #3.
+- **#6 Who deploys DRIP.** If Pons deploys the token, `contracts/src/DripToken.sol` becomes a
+  reference rather than a deployed artifact, and Phase 1 shrinks to the fee-distribution path.
 
 Legend: ❓ Open · 🔬 Investigating · ✅ Resolved · ⛔ Blocked

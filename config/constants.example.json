@@ -4,20 +4,31 @@
     "totalSupply": null,
     "$comment_totalSupply": "TBD — set in Phase 0 tokenomics finalize."
   },
-  "fee": {
-    "totalBps": 400,
-    "launchpadBps": 100,
-    "autoBuyBps": 200,
-    "marketingBps": 100,
-    "$comment": "Basis points. 400 = 4%. The LAUNCHPAD collects this fee on trades — we do not levy it. Slices must sum to totalBps. Marketing slice may double as ops treasury — see DECISIONS.md #1."
+  "ponsFee": {
+    "$comment": "Pons COLLECTS the trade fee — we do not levy it. Fee params are set per launch and read on-chain, snapshotted at launch and immutable. Confirm the real values on-chain (BLOCKERS.md #3). Below are our launch INTENT + the commonly-cited default for reference.",
+    "totalTradeFeeBps": null,
+    "creatorShareBps": 7000,
+    "protocolShareBps": 3000,
+    "creatorNetTargetBpsOfVolume": 300,
+    "defaultReference": {
+      "totalTradeFeeBps": 100,
+      "creatorShareBps": 7000,
+      "creatorNetBpsOfVolume": 70,
+      "$comment": "Pons default ≈1% total, 70% creator → ~0.7% of volume. To net ~3% of volume (creatorNetTargetBpsOfVolume=300) the total trade fee must be configured high at launch (≈430 bps). Tradeoff: high fee suppresses volume and is locked forever. See DECISIONS.md #5."
+    }
+  },
+  "internalSplit": {
+    "autoBuyShareBps": 6667,
+    "marketingShareBps": 3333,
+    "$comment": "How WE split the ETH creator fees Pons pays us (keeps the spec's 2:1 auto-buy:marketing intent). Shares are of RECEIVED creator fees and must sum to 10000. Marketing may double as ops treasury — DECISIONS.md #1."
   },
   "feeSource": {
+    "launchpad": "pons",
     "mode": "push",
     "receive": "net",
-    "feeWallet": null,
-    "launchpadWallet": null,
-    "feeToken": null,
-    "$comment": "How the launchpad delivers our fee share (DECISIONS.md #5, BLOCKERS.md #3). mode: 'push' (launchpad credits feeWallet, we designate it) or 'pull' (keeper withdraws from the launchpad wallet). receive: 'net' (launchpad keeps its 1%, we get 3%) or 'gross' (we get 4% and forward 1% to launchpadWallet). feeToken: the token fees are paid in (affects the swap path). Fill in real addresses before use."
+    "feeToken": "ETH",
+    "payoutWallet": null,
+    "$comment": "Pons delivery (DECISIONS.md #5, BLOCKERS.md #3). mode 'push': enable Pons automation to route creator fees to payoutWallet (we designate it); 'pull' would call Pons' claim entrypoint instead. receive 'net': Pons keeps its protocol cut before we receive (we do NOT forward anything). feeToken 'ETH': Pons V2 pays creator fees in ETH — the keeper swaps this to the Stock Token. Fill in payoutWallet before use."
   },
   "cycle": {
     "durationSeconds": 3600,

@@ -4,50 +4,46 @@ pragma solidity ^0.8.26;
 import {IFeeDistributor} from "./interfaces/IFeeDistributor.sol";
 
 /// @title FeeDistributor
-/// @notice Distributes fee revenue that the **launchpad already collected** on DRIP trades. Drip
-///         levies no fee of its own (no Uniswap hook, no tax-on-transfer). The launchpad's venue
-///         takes the 4% and makes our share available; this contract only splits what arrives:
-///           - 2% -> auto-buy buffer (keeper swaps to Stock Token(s))
-///           - 1% -> marketing/ops treasury
-///           - 1% -> launchpad (retained by them under ReceiveNet; forwarded by us under ReceiveGross)
-/// @dev    Splitting on-chain is OPTIONAL — the keeper can do the same split off-chain by moving
-///         tokens directly. This contract is the transparent, verifiable variant. See
-///         contracts/README.md and docs/ARCHITECTURE.md.
+/// @notice Splits the **creator fees Pons pays us in ETH** on DRIP trades. Drip levies no fee of its
+///         own (no Uniswap hook, no tax-on-transfer). Pons's venue takes the trade fee, keeps its
+///         protocol cut, and routes our creator share (ETH) to our payout wallet via automation.
+///         This contract splits that ETH, keeping the spec's 2:1 intent:
+///           - ~2/3 -> auto-buy buffer (ETH), swapped to Stock Token(s) by the keeper
+///           - ~1/3 -> marketing/ops treasury
+///         Nothing is forwarded to Pons — it already took its cut before we received anything.
+/// @dev    Splitting on-chain is OPTIONAL — the keeper can move the ETH directly. This is the
+///         transparent, verifiable variant. Shares mirror config/constants.json internalSplit.*
+///         and must sum to 10_000. See contracts/README.md and docs/ARCHITECTURE.md.
 ///
 /// TODO(Phase 1):
-///   - Set feeMode + immutable destinations (marketingTreasury, launchpadWallet, reserveManager).
-///   - distribute(): compute slices from the balance held; use SafeERC20; retain the auto-buy slice
-///     in the buffer for the keeper; emit FeeDistributed. Keep it permissionless + idempotent.
-///   - Handle rounding dust deterministically.
+///   - Set immutable destinations (marketingTreasury, reserveManager/auto-buy sink).
+///   - Accept ETH (receive() external payable) — Pons automation credits this wallet/contract.
+///   - distribute(): split the held ETH balance by the bps below; send marketing slice; retain the
+///     auto-buy slice as `buffer` for the keeper; emit FeeDistributed. Permissionless + idempotent.
+///   - Handle rounding dust deterministically (assign remainder to one slice).
 contract FeeDistributor is IFeeDistributor {
-    // Basis points — mirror config/constants.json (fee.*). Slices are of the total 4% fee.
-    uint16 public constant AUTO_BUY_BPS = 200; // 2%
-    uint16 public constant MARKETING_BPS = 100; // 1%
-    uint16 public constant LAUNCHPAD_BPS = 100; // 1% (retained by launchpad, or forwarded by us)
-    uint16 public constant TOTAL_BPS = 400; // 4%
+    // Basis points of RECEIVED creator fees (config/constants.json internalSplit.*). Must sum to 10_000.
+    uint16 public constant AUTO_BUY_SHARE_BPS = 6667; // ~2/3 -> Stock Token auto-buy
+    uint16 public constant MARKETING_SHARE_BPS = 3333; // ~1/3 -> marketing/ops
+    uint16 public constant BPS_DENOMINATOR = 10_000;
 
-    // FeeMode public immutable override feeMode;
     // address public immutable marketingTreasury;
-    // address public immutable launchpadWallet; // only used under ReceiveGross
-    // mapping(address token => uint256) internal _buffer;
+    // address public immutable autoBuySink; // ReserveManager or a buffer the keeper swaps from
+    // uint256 internal _buffer;
+
+    /// @notice Accept ETH creator fees routed here by Pons automation.
+    receive() external payable {}
 
     /// @inheritdoc IFeeDistributor
-    function distribute(address token) external override returns (uint256 autoBuy) {
-        // TODO(Phase 1): split the held balance of `token`; forward marketing (+launchpad if gross);
-        //                retain the auto-buy slice in the buffer; emit FeeDistributed.
-        token;
+    function distribute() external override returns (uint256 autoBuy) {
+        // TODO(Phase 1): split address(this).balance by the bps above; send marketing slice to the
+        //                treasury; retain the auto-buy slice in `buffer`; emit FeeDistributed.
         revert("FeeDistributor: not implemented");
     }
 
     /// @inheritdoc IFeeDistributor
-    function bufferOf(address token) external view override returns (uint256) {
-        token;
+    function buffer() external view override returns (uint256) {
+        // return _buffer;
         return 0;
-    }
-
-    /// @inheritdoc IFeeDistributor
-    function feeMode() external pure override returns (FeeMode) {
-        // Default assumption: launchpad keeps its 1% and routes us the rest. Confirm — DECISIONS.md #5.
-        return FeeMode.ReceiveNet;
     }
 }

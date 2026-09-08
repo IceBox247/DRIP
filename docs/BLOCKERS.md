@@ -48,25 +48,30 @@ textbook definition of an **investment contract** (securities exposure). Stock T
 
 ---
 
-## Dependency 3 — Launchpad fee access (confirm before Phase 1)
+## Dependency 3 — Pons fee economics (confirm on-chain before Phase 1)
 
-The whole reward engine assumes the launchpad **delivers our share of the 4% fee** to us. We build
-no fee-collection mechanism of our own; if the fee never actually reaches a wallet we can spend
-from, there is nothing to convert into Stock Tokens.
+Launchpad is **Pons** (Robinhood Chain). The whole reward engine is funded by the **creator fees
+Pons pays us in ETH**. We build no fee collection of our own. Two things must be checked, because
+public sources conflict and Pons fee params are **immutable once set at launch**:
 
-**Confirm with the launchpad:**
+**Confirm against Pons docs + on-chain:**
 
-- [ ] The launchpad routes our share of the trade fee to a wallet we control (**push**), or grants
-      us withdraw rights on its fee wallet (**pull**). (DECISIONS.md #5a)
-- [ ] Whether we receive the net 3% (launchpad keeps its 1%) or the gross 4%. (DECISIONS.md #5b)
-- [ ] The token the fee is paid in (DRIP? the pair's quote token? stablecoin?) — affects the swap
-      path to the Stock Token.
-- [ ] Delivery cadence / claim mechanics (continuous, or claimable in batches).
-- [ ] Test the full receive → distribute path on **testnet (46630)** with the real launchpad
-      integration (or a faithful mock) before Phase 3.
+- [ ] **Fee size.** Pons's cited default is **~1% total / ~70% creator ≈ 0.7% of volume** — NOT 3%.
+      Netting our ~3% target needs a high total trade fee configured at launch (~4.3%+). Confirm Pons
+      permits a fee that high and that it's worth the volume suppression. (DECISIONS.md #5)
+- [ ] **Split & immutability.** Read the exact creator/protocol split for our launch; it is
+      snapshotted at launch and can never change. Get it right the first time.
+- [ ] **Currency.** Confirm creator fees are paid in **ETH** (Pons V2 default assumed here) — fixes
+      the keeper's swap path (ETH → Stock Token).
+- [ ] **Delivery.** Confirm Pons **automation can route creator fees to a payout wallet we
+      designate** (push, no keys), vs. needing a manual/claim call (pull).
+- [ ] **Cadence.** Confirm claim/settlement cadence (Pons runs a per-token vault ~every 5 min).
+- [ ] Test the full receive → distribute → swap path on **testnet (46630)** against Pons (or a
+      faithful mock) before Phase 3.
 
-**Status:** ⛔ Not confirmed. Less severe than #1/#2 (the user reports the launchpad does provide
-the fee), but it is a hard dependency for the fee engine and must be verified, not assumed.
+**Status:** ⛔ Not confirmed on-chain. The fee *mechanism* exists (Pons pays creators), but the
+**economics (fee size vs. the 3% target) are the open risk** and are locked at launch — verify, do
+not assume.
 
 ## Gate policy
 

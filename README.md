@@ -1,15 +1,20 @@
 # Drip ($DRIP)
 
-A **fair-launch ERC-20** on **Robinhood Chain** whose **4% trade fee** funds a **tokenized-stock
-reward pool**. The team holds no tokens. Users run an in-app "mining node" (a server-side accrual
-timer — **not** real mining) and earn *hash rate* from their DRIP holdings plus task and referral
-boosts; hash rate accrues points, and points entitle users to claim real Stock Tokens bought by the
-fee engine.
+A **fair-launch ERC-20** on **Robinhood Chain** (launched via **Pons**) whose **trade fee** funds a
+**tokenized-stock reward pool**. The team holds no tokens. Users run an in-app "mining node" (a
+server-side accrual timer — **not** real mining) and earn *hash rate* from their DRIP holdings plus
+task and referral boosts; hash rate accrues points, and points entitle users to claim real Stock
+Tokens bought by the fee engine.
 
-**The launchpad collects the 4% fee — we don't.** DRIP is a plain ERC-20 with no fee logic; there is
-no Uniswap hook and no tax-on-transfer on our side. The launchpad's trading venue takes the fee and
-delivers our share to a wallet, and our system distributes it (2% → Stock Tokens, 1% → marketing,
-1% → launchpad) and runs the reward engine. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+**Pons (the launchpad) collects the fee — we don't.** DRIP is a plain ERC-20 with no fee logic; no
+Uniswap hook, no tax-on-transfer on our side. Pons's venue takes the trade fee, keeps its protocol
+cut, and pays our **creator share in ETH** to a payout wallet we designate (via Pons automation).
+Our system distributes that ETH (~2/3 → Stock Tokens, ~1/3 → marketing/ops) and runs the reward
+engine. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
+> **Fee-size caveat:** Pons's default nets the creator only ~0.7% of volume, not 3%. Netting ~3%
+> requires configuring a **high trade fee at launch** — which is locked forever and suppresses
+> volume. This is the key open risk; see [`docs/BLOCKERS.md`](./docs/BLOCKERS.md) #3.
 
 > **The full specification is the source of truth:** [`docs/SPEC.md`](./docs/SPEC.md).
 
@@ -17,7 +22,7 @@ delivers our share to a wallet, and our system distributes it (2% → Stock Toke
 
 ## ⚠️ Read before building
 
-This project sits on top of two hard gates. See [`docs/BLOCKERS.md`](./docs/BLOCKERS.md):
+This project sits on top of hard gates. See [`docs/BLOCKERS.md`](./docs/BLOCKERS.md):
 
 1. **Stock Token transferability** — the reward payout depends on sending Stock Tokens to arbitrary
    wallets. These were whitelist-gated. **Verify freely transferable on-chain before building the
@@ -25,8 +30,11 @@ This project sits on top of two hard gates. See [`docs/BLOCKERS.md`](./docs/BLOC
 2. **Legal / securities exposure** — a bought token + a reward promise looks like an investment
    contract; Stock Tokens are blocked for US persons. **This repo is not legal advice.** Get counsel,
    structure offshore, geoblock US **before launch.**
+3. **Pons fee economics** — the reward engine is funded by Pons creator fees (ETH). Pons's default
+   nets ~0.7% of volume, not 3%; the fee is **locked at launch**. Confirm the on-chain fee params
+   and the volume tradeoff before launching.
 
-Nothing here should be deployed to mainnet or promoted publicly until both gates clear.
+Nothing here should be deployed to mainnet or promoted publicly until these gates clear.
 
 ---
 

@@ -11,7 +11,8 @@
 
 ## 1. Concept (one paragraph)
 
-Drip is a **fair-launch ERC-20 token** on **Robinhood Chain** whose **4% trade fee** funds a
+Drip is a **fair-launch ERC-20 token** on **Robinhood Chain** (launched via **Pons**) whose
+**trade fee** funds a
 **tokenized-stock reward pool**. The team holds no tokens. Users connect a wallet + X account,
 run an in-app "mining node" (a server-side accrual timer — **not** real mining), and earn
 **hash rate** based on how much DRIP they hold, plus boosts from tasks and referrals. Hash rate
@@ -22,30 +23,40 @@ The more DRIP you hold, the larger your share of the stock.
 
 ## 2. Core mechanics
 
-### 2.1 The fee (4% on DRIP trades)
+### 2.1 The fee — collected by Pons, netted to us in ETH
 
-| Slice | % | Destination |
-|---|---|---|
-| Launchpad | 1% | Launchpad wallet (retained by the launchpad) |
-| Auto-buy | 2% | Stock-buy buffer → converted to Stock Tokens hourly |
-| Marketing / Ops | 1% | Marketing treasury (**also funds servers/audit/legal — see §7**) |
+**Launchpad: Pons (on Robinhood Chain). Pons collects the trade fee — we do not.** Drip builds no
+on-chain fee mechanism: no tax-on-transfer, no Uniswap hook. DRIP is a plain ERC-20 (Pons may
+deploy it as part of the launch).
 
-**The launchpad collects the fee — we do not.** The launchpad's trading venue already takes the 4%
-on every DRIP trade. Drip does **not** build any on-chain fee mechanism: no tax-on-transfer, and
-**no Uniswap v4 hook.** DRIP is a plain ERC-20 (which the launchpad may even deploy for us).
+How Pons fees actually work (verify against Pons docs/on-chain params — see
+[BLOCKERS.md](./BLOCKERS.md) #3):
 
-What we build starts *after* the fee is collected. The launchpad makes our share available — either
-**pushed** to a wallet we control, or **pullable** from the launchpad's fee wallet — and our system
-distributes it:
+- Pons charges a trade fee whose **parameters are set per launch and read on-chain**, and are
+  **snapshotted at launch — they can never change afterward.**
+- The fee splits between the **creator (us)** and the **Pons protocol**. Commonly-cited default:
+  **~1% total, ~70% creator / ~30% protocol** → creator nets **~0.7% of volume**.
+- **Creator fees are paid in ETH** (Pons V2 default), not in DRIP.
+- We collect them by turning on **Pons automation that routes creator fees to a payout wallet we
+  designate** (push). Manual claim from the Pons interface, and native pro-rata fee-sharing to
+  holders, also exist.
 
-- **2%** → auto-buy buffer → keeper swaps it into Stock Token(s) hourly.
-- **1%** → marketing/ops treasury.
-- **1%** → the launchpad keeps (their cut).
+**Funding target — `[DECISION: net ~3% of volume to the creator]`.** Because Pons fee params are
+configurable per launch, hitting ~3% net means **configuring a high total trade fee at launch**
+(≈4%+ so our ~70% creator share ≈ 3%). ⚠️ Tradeoff: a high trade fee suppresses volume and is
+**locked forever at launch** — confirm Pons allows a fee this high and model the volume impact
+before committing (see DECISIONS.md #5).
 
-So the "fee engine" is a **treasury + keeper system operating on a wallet**, not a token that taxes
-its own trades. Two integration details to confirm with the launchpad (see [DECISIONS.md](./DECISIONS.md)
-#5): (a) push vs. pull delivery, and (b) whether we receive the net 3% (launchpad keeps its 1%
-first) or the gross 4% (we forward 1% back).
+What we do with the ETH we net — **our internal split** (of received creator fees, keeping the
+spec's 2:1 intent):
+
+- **~2/3 → auto-buy buffer** → keeper swaps ETH into Stock Token(s) hourly.
+- **~1/3 → marketing/ops treasury** (also funds servers/audit/legal — see §7).
+
+Pons's own protocol cut is taken by Pons before we receive anything — it is not a slice we route.
+
+So the "fee engine" is a **treasury + keeper system** operating on the ETH Pons pays us, not a token
+that taxes its own trades.
 
 ### 2.2 Hash rate formula `[DEFAULT]`
 
@@ -134,9 +145,9 @@ On low/zero-volume cycles (little or no new stock bought):
 | Layer | Component | Notes |
 |---|---|---|
 | Chain | Robinhood Chain | Mainnet chain ID **4663**, testnet **46630**. EVM, Arbitrum Orbit stack. |
-| Launchpad | Fee collection (external) | The launchpad's venue takes the 4% on trades and delivers our share. We do NOT build this. |
-| Contract | `DripToken.sol` | Plain ERC-20, no fee logic (may be launchpad-deployed). |
-| Contract | `FeeDistributor.sol` | Splits the fee **received from the launchpad** → 2% auto-buy / 1% marketing (/ 1% launchpad). Optional on-chain; can be done in the keeper. |
+| Launchpad | **Pons** (external) | Pons collects the trade fee on Robinhood Chain and pays our creator share in ETH. We do NOT build this. |
+| Contract | `DripToken.sol` | Plain ERC-20, no fee logic (may be Pons-deployed). |
+| Contract | `FeeDistributor.sol` | Splits the **ETH creator fees received from Pons** → ~2/3 auto-buy / ~1/3 marketing. Optional on-chain; can be done in the keeper. |
 | Contract | `RewardVault.sol` | Holds Stock Tokens, Merkle-claim payouts. |
 | Contract | `ReserveManager.sol` | 50/50 split + dynamic drawdown logic (§3). |
 | Automation | Keeper (Gelato or Chainlink Automation) | **Contracts can't self-trigger.** External keeper calls the hourly auto-buy + convert + split. |
@@ -144,10 +155,11 @@ On low/zero-volume cycles (little or no new stock bought):
 | Backend | Auth | Wallet connect + X OAuth. |
 | Frontend | Web + mobile | Node dashboard, hash rate, claimable stock, referral link, task list. |
 
-**Data flow:** trade → **launchpad collects 4% fee** → our share lands in the fee wallet →
-`FeeDistributor`/keeper splits (2% auto-buy / 1% marketing / 1% launchpad) → keeper (hourly) swaps
-the 2% buffer to Stock Token → ReserveManager splits 50/50 → backend computes per-user allocations
-from points → publishes Merkle root → users claim from RewardVault.
+**Data flow:** trade → **Pons collects the trade fee** (keeps its protocol cut) → **Pons automation
+routes our creator share (ETH) to our payout wallet** → `FeeDistributor`/keeper splits (~2/3 auto-buy
+/ ~1/3 marketing) → keeper (hourly) swaps the auto-buy ETH → Stock Token → ReserveManager splits
+50/50 → backend computes per-user allocations from points → publishes Merkle root → users claim from
+RewardVault.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository mapping.
 
@@ -156,18 +168,21 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository
 ## 7. Open decisions (resolve before Phase 1)
 
 1. **Ops funding.** Team holds no tokens. Servers, audit (5-figure, non-negotiable), legal, and
-   X API all cost money. Right now only the 1% marketing slice can cover this. **Decide:** does
-   marketing 1% double as ops treasury, or add a small ops slice?
+   X API all cost money. Our only revenue is the ETH creator fees Pons pays us, split ~2/3 auto-buy
+   / ~1/3 marketing-ops. **Decide:** does the marketing share double as the ops treasury, or carve
+   out a dedicated ops share from what we net? (Note: our net take is small — see BLOCKERS #3.)
 2. **Points unit name.** Is there a specific name for the in-app earning unit (the "hash/points")?
    (The voice note mentioned a term I couldn't decode.)
 3. **Which Stock Token(s)** does the 2% buy? One (e.g. a broad ETF token) or a basket?
    `[DEFAULT: single liquid ETF-style token for simplicity]`
 4. **Referral depth** (§4).
-5. **Launchpad fee delivery.** (a) Push (launchpad sends our share to a wallet we designate) vs.
-   pull (we have withdraw rights on the launchpad fee wallet)? (b) Do we receive the net 3%
-   (launchpad keeps its 1% first) or the gross 4% (we forward 1% back)? See §2.1.
-6. **Who deploys DRIP?** The launchpad may deploy the token as part of the fair launch, or we deploy
-   a plain ERC-20 and list it. Confirm which — it changes what we build in Phase 1.
+5. **Pons fee configuration.** `[DECIDED: net ~3% of volume to creator, delivered in ETH via Pons
+   automation → our payout wallet.]` Still to confirm on-chain: (a) that Pons permits a total trade
+   fee high enough that our ~70% creator share ≈ 3%, (b) the exact creator/protocol split for our
+   launch (locked at launch, immutable), (c) the fee currency (ETH assumed), and (d) the volume
+   impact of a high fee. See §2.1 and BLOCKERS.md #3.
+6. **Who deploys DRIP?** Pons may deploy the token as part of the launch, or we deploy a plain
+   ERC-20 and list it. Confirm which — it changes what we build in Phase 1.
 
 Tracked in [DECISIONS.md](./DECISIONS.md).
 
@@ -192,9 +207,9 @@ Tracked in [BLOCKERS.md](./BLOCKERS.md).
 ## 9. Build order
 
 - **Phase 0 — Legal + tokenomics finalize + ops funding.** (Do first.)
-- **Phase 1 — Contracts on testnet (46630):** confirm the launchpad fee delivery + DRIP token
-  (may be launchpad-deployed); build `FeeDistributor` to split the fee we receive. **No fee hook —
-  the launchpad collects the fee.**
+- **Phase 1 — Contracts on testnet (46630):** confirm Pons fee config + delivery + DRIP token
+  (may be Pons-deployed); build `FeeDistributor` to split the ETH creator fees we receive. **No fee
+  hook — Pons collects the fee.**
 - **Phase 2 — Backend + app:** accounts, node timer, hash rate, points, X auth, tasks, referral graph.
 - **Phase 3 — Reward engine:** keeper auto-buy + ReserveManager (50/50 + dynamic draw) + RewardVault + Merkle claim.
 - **Phase 4 — Audit → mainnet → launchpad listing → seed liquidity → marketing.**
@@ -206,10 +221,12 @@ See [ROADMAP.md](./ROADMAP.md).
 ## 10. Suggested default constants (tune all)
 
 ```
-FEE_TOTAL          = 4%
-FEE_LAUNCHPAD      = 1%
-FEE_AUTOBUY        = 2%
-FEE_MARKETING      = 1%
+LAUNCHPAD          = Pons (Robinhood Chain)
+FEE_CURRENCY       = ETH (Pons V2 creator fees)
+CREATOR_NET_TARGET = ~3% of volume   // requires a high per-launch fee; Pons default nets ~0.7%
+FEE_DELIVERY       = push (Pons automation -> our payout wallet)
+SPLIT_AUTOBUY      = ~2/3 of net creator fees   // -> Stock Token auto-buy
+SPLIT_MARKETING    = ~1/3 of net creator fees   // -> marketing/ops
 CYCLE              = 1 hour
 RESERVE_SPLIT      = 50% reserve / 50% distribute
 RESERVE_DRAW_HIGH  = 2%

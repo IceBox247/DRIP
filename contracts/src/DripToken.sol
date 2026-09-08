@@ -5,14 +5,13 @@ pragma solidity ^0.8.26;
 
 /// @title DripToken ($DRIP)
 /// @notice Fair-launch ERC-20 for Drip. No team allocation. A **plain** ERC-20 with NO fee logic.
-/// @dev    IMPORTANT: The 4% trade fee is collected by the **launchpad's trading venue**, NOT by
-///         this token and NOT by any Drip contract. There is no tax-on-transfer and no Uniswap
-///         hook on our side — the launchpad takes the fee and routes our share to a wallet we
-///         control (or one we can pull from). See SPEC §2.1, docs/ARCHITECTURE.md.
+/// @dev    IMPORTANT: The trade fee is collected by **Pons** (the launchpad), NOT by this token and
+///         NOT by any Drip contract. There is no tax-on-transfer and no Uniswap hook on our side —
+///         Pons takes the fee, keeps its protocol cut, and pays our creator share in ETH to a payout
+///         wallet we designate. See SPEC §2.1, docs/ARCHITECTURE.md.
 ///
-/// NOTE: The launchpad may deploy the token itself as part of the fair launch. If so, this file is
-///       a reference for the expected shape rather than the deployed artifact — confirm who deploys
-///       (DECISIONS.md #6).
+/// NOTE: Pons may deploy the token itself as part of the launch. If so, this file is a reference for
+///       the expected shape rather than the deployed artifact — confirm who deploys (DECISIONS.md #6).
 ///
 /// TODO(Phase 1, only if WE deploy the token):
 ///   - Extend OpenZeppelin ERC20 once `forge install OpenZeppelin/openzeppelin-contracts` is run.
