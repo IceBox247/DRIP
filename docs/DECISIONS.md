@@ -8,9 +8,9 @@ that contradicts an unresolved decision here.
 |---|---|---|---|---|
 | 1 | **Ops funding** — does the marketing 1% double as ops treasury, or add a dedicated ops slice? Servers, audit (5-figure), legal, and X API all cost money and the team holds no tokens. | Marketing 1% doubles as ops | ❓ Open | — |
 | 2 | **Points unit name** — the in-app earning unit ("hash/points") needs a canonical name for UI + code. | `points` (placeholder) | ❓ Open | — |
-| 3 | **Which Stock Token(s)** does the auto-buy purchase (with our netted ETH) — one liquid ETF-style token, or a basket? | Single liquid ETF-style token | ❓ Open | — |
+| 3 | **Which Stock Token(s)** does the auto-buy purchase (with our netted USDG) — one liquid ETF-style token, or a basket? | Single liquid ETF-style token | ❓ Open | — |
 | 4 | **Referral depth** — single-level or multi-level? | Single level | ❓ Open | — |
-| 5 | **Pons fee config** — total trade fee, creator/protocol split, currency, delivery. | Net ~3% to creator, ETH, push via Pons automation | 🔬 Decided-pending-verify | Launchpad = **Pons**. Deliver creator fees in **ETH** to our payout wallet via **push** automation; **net** (Pons keeps its cut). Target **~3% of volume net** to creator → needs a high per-launch fee (default nets ~0.7%). Verify on-chain params (immutable at launch) + volume impact. |
+| 5 | **Pons fee config** — total trade fee, creator/protocol split, currency, delivery. | Net ~3% to creator, USDG, push via Pons automation | 🔬 Decided-pending-verify | Launchpad = **Pons**. Deliver creator fees in **USDG** to our payout wallet via **push** automation; **net** (Pons keeps its cut). Target **~3% of volume net** to creator → needs a high per-launch fee (default nets ~0.7%). Verify on-chain params (immutable at launch) + volume impact. |
 | 6 | **Who deploys DRIP** — Pons deploys it as part of the launch, or we deploy a plain ERC-20 and list it? | Confirm with Pons | ❓ Open | — |
 
 ## Notes
@@ -26,7 +26,8 @@ that contradicts an unresolved decision here.
 - **#5 Pons fee config.** ⚠️ The big one. Pons's default is ~1% total / ~70% creator (~0.7% of
   volume) — **not** 3%. Netting ~3% requires configuring a high total trade fee at launch (~4.3%+),
   which is **locked forever** and suppresses volume. Before committing: confirm on-chain that Pons
-  allows a fee this high, read the exact per-launch split, confirm the currency (ETH assumed), and
+  allows a fee this high, read the exact per-launch split, confirm the currency (USDG — Robinhood
+  Chain's stablecoin), and
   model the volume hit. Delivery is **push** (Pons automation → payout wallet), so the keeper needs
   no privileged keys and `FeeDistributor` never forwards anything back (net). See BLOCKERS #3.
 - **#6 Who deploys DRIP.** If Pons deploys the token, `contracts/src/DripToken.sol` becomes a

@@ -23,7 +23,7 @@ The more DRIP you hold, the larger your share of the stock.
 
 ## 2. Core mechanics
 
-### 2.1 The fee — collected by Pons, netted to us in ETH
+### 2.1 The fee — collected by Pons, netted to us in USDG
 
 **Launchpad: Pons (on Robinhood Chain). Pons collects the trade fee — we do not.** Drip builds no
 on-chain fee mechanism: no tax-on-transfer, no Uniswap hook. DRIP is a plain ERC-20 (Pons may
@@ -36,7 +36,9 @@ How Pons fees actually work (verify against Pons docs/on-chain params — see
   **snapshotted at launch — they can never change afterward.**
 - The fee splits between the **creator (us)** and the **Pons protocol**. Commonly-cited default:
   **~1% total, ~70% creator / ~30% protocol** → creator nets **~0.7% of volume**.
-- **Creator fees are paid in ETH** (Pons V2 default), not in DRIP.
+- **Creator fees are paid in USDG** — Global Dollar, Robinhood Chain's ERC-20 stablecoin — not in
+  DRIP. (USDG being a dollar stablecoin makes the marketing/ops slice dollar-denominated and the
+  auto-buy a clean stable → stock swap.)
 - We collect them by turning on **Pons automation that routes creator fees to a payout wallet we
   designate** (push). Manual claim from the Pons interface, and native pro-rata fee-sharing to
   holders, also exist.
@@ -47,15 +49,15 @@ configurable per launch, hitting ~3% net means **configuring a high total trade 
 **locked forever at launch** — confirm Pons allows a fee this high and model the volume impact
 before committing (see DECISIONS.md #5).
 
-What we do with the ETH we net — **our internal split** (of received creator fees, keeping the
+What we do with the USDG we net — **our internal split** (of received creator fees, keeping the
 spec's 2:1 intent):
 
-- **~2/3 → auto-buy buffer** → keeper swaps ETH into Stock Token(s) hourly.
+- **~2/3 → auto-buy buffer** → keeper swaps USDG into Stock Token(s) hourly.
 - **~1/3 → marketing/ops treasury** (also funds servers/audit/legal — see §7).
 
 Pons's own protocol cut is taken by Pons before we receive anything — it is not a slice we route.
 
-So the "fee engine" is a **treasury + keeper system** operating on the ETH Pons pays us, not a token
+So the "fee engine" is a **treasury + keeper system** operating on the USDG Pons pays us, not a token
 that taxes its own trades.
 
 ### 2.2 Hash rate formula `[DEFAULT]`
@@ -145,9 +147,9 @@ On low/zero-volume cycles (little or no new stock bought):
 | Layer | Component | Notes |
 |---|---|---|
 | Chain | Robinhood Chain | Mainnet chain ID **4663**, testnet **46630**. EVM, Arbitrum Orbit stack. |
-| Launchpad | **Pons** (external) | Pons collects the trade fee on Robinhood Chain and pays our creator share in ETH. We do NOT build this. |
+| Launchpad | **Pons** (external) | Pons collects the trade fee on Robinhood Chain and pays our creator share in USDG. We do NOT build this. |
 | Contract | `DripToken.sol` | Plain ERC-20, no fee logic (may be Pons-deployed). |
-| Contract | `FeeDistributor.sol` | Splits the **ETH creator fees received from Pons** → ~2/3 auto-buy / ~1/3 marketing. Optional on-chain; can be done in the keeper. |
+| Contract | `FeeDistributor.sol` | Splits the **USDG creator fees received from Pons** → ~2/3 auto-buy / ~1/3 marketing. Optional on-chain; can be done in the keeper. |
 | Contract | `RewardVault.sol` | Holds Stock Tokens, Merkle-claim payouts. |
 | Contract | `ReserveManager.sol` | 50/50 split + dynamic drawdown logic (§3). |
 | Automation | Keeper (Gelato or Chainlink Automation) | **Contracts can't self-trigger.** External keeper calls the hourly auto-buy + convert + split. |
@@ -156,8 +158,8 @@ On low/zero-volume cycles (little or no new stock bought):
 | Frontend | Web + mobile | Node dashboard, hash rate, claimable stock, referral link, task list. |
 
 **Data flow:** trade → **Pons collects the trade fee** (keeps its protocol cut) → **Pons automation
-routes our creator share (ETH) to our payout wallet** → `FeeDistributor`/keeper splits (~2/3 auto-buy
-/ ~1/3 marketing) → keeper (hourly) swaps the auto-buy ETH → Stock Token → ReserveManager splits
+routes our creator share (USDG) to our payout wallet** → `FeeDistributor`/keeper splits (~2/3 auto-buy
+/ ~1/3 marketing) → keeper (hourly) swaps the auto-buy USDG → Stock Token → ReserveManager splits
 50/50 → backend computes per-user allocations from points → publishes Merkle root → users claim from
 RewardVault.
 
@@ -168,7 +170,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository
 ## 7. Open decisions (resolve before Phase 1)
 
 1. **Ops funding.** Team holds no tokens. Servers, audit (5-figure, non-negotiable), legal, and
-   X API all cost money. Our only revenue is the ETH creator fees Pons pays us, split ~2/3 auto-buy
+   X API all cost money. Our only revenue is the USDG creator fees Pons pays us, split ~2/3 auto-buy
    / ~1/3 marketing-ops. **Decide:** does the marketing share double as the ops treasury, or carve
    out a dedicated ops share from what we net? (Note: our net take is small — see BLOCKERS #3.)
 2. **Points unit name.** Is there a specific name for the in-app earning unit (the "hash/points")?
@@ -176,10 +178,11 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository
 3. **Which Stock Token(s)** does the 2% buy? One (e.g. a broad ETF token) or a basket?
    `[DEFAULT: single liquid ETF-style token for simplicity]`
 4. **Referral depth** (§4).
-5. **Pons fee configuration.** `[DECIDED: net ~3% of volume to creator, delivered in ETH via Pons
+5. **Pons fee configuration.** `[DECIDED: net ~3% of volume to creator, delivered in USDG via Pons
    automation → our payout wallet.]` Still to confirm on-chain: (a) that Pons permits a total trade
    fee high enough that our ~70% creator share ≈ 3%, (b) the exact creator/protocol split for our
-   launch (locked at launch, immutable), (c) the fee currency (ETH assumed), and (d) the volume
+   launch (locked at launch, immutable), (c) the fee currency (USDG — Robinhood Chain's stablecoin),
+   and (d) the volume
    impact of a high fee. See §2.1 and BLOCKERS.md #3.
 6. **Who deploys DRIP?** Pons may deploy the token as part of the launch, or we deploy a plain
    ERC-20 and list it. Confirm which — it changes what we build in Phase 1.
@@ -208,7 +211,7 @@ Tracked in [BLOCKERS.md](./BLOCKERS.md).
 
 - **Phase 0 — Legal + tokenomics finalize + ops funding.** (Do first.)
 - **Phase 1 — Contracts on testnet (46630):** confirm Pons fee config + delivery + DRIP token
-  (may be Pons-deployed); build `FeeDistributor` to split the ETH creator fees we receive. **No fee
+  (may be Pons-deployed); build `FeeDistributor` to split the USDG creator fees we receive. **No fee
   hook — Pons collects the fee.**
 - **Phase 2 — Backend + app:** accounts, node timer, hash rate, points, X auth, tasks, referral graph.
 - **Phase 3 — Reward engine:** keeper auto-buy + ReserveManager (50/50 + dynamic draw) + RewardVault + Merkle claim.
@@ -222,7 +225,7 @@ See [ROADMAP.md](./ROADMAP.md).
 
 ```
 LAUNCHPAD          = Pons (Robinhood Chain)
-FEE_CURRENCY       = ETH (Pons V2 creator fees)
+FEE_CURRENCY       = USDG (Robinhood Chain stablecoin; ERC-20)
 CREATOR_NET_TARGET = ~3% of volume   // requires a high per-launch fee; Pons default nets ~0.7%
 FEE_DELIVERY       = push (Pons automation -> our payout wallet)
 SPLIT_AUTOBUY      = ~2/3 of net creator fees   // -> Stock Token auto-buy

@@ -7,7 +7,7 @@ pragma solidity ^0.8.26;
 /// @notice Fair-launch ERC-20 for Drip. No team allocation. A **plain** ERC-20 with NO fee logic.
 /// @dev    IMPORTANT: The trade fee is collected by **Pons** (the launchpad), NOT by this token and
 ///         NOT by any Drip contract. There is no tax-on-transfer and no Uniswap hook on our side —
-///         Pons takes the fee, keeps its protocol cut, and pays our creator share in ETH to a payout
+///         Pons takes the fee, keeps its protocol cut, and pays our creator share in USDG to a payout
 ///         wallet we designate. See SPEC §2.1, docs/ARCHITECTURE.md.
 ///
 /// NOTE: Pons may deploy the token itself as part of the launch. If so, this file is a reference for

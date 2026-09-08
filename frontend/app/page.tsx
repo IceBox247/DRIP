@@ -196,8 +196,8 @@ export default function Home() {
           <div className="rounded-2xl border border-line bg-panel p-7">
             <ol className="flex flex-col gap-4 md:flex-row md:items-stretch md:gap-0">
               {[
-                { t: "Trade fee", d: `${site.launchpad} collects the fee on DRIP trades and pays our creator share in ETH.` },
-                { t: "Auto-buy", d: "Most of that ETH is swapped into tokenized Stock Tokens each cycle." },
+                { t: "Trade fee", d: `${site.launchpad} collects the fee on DRIP trades and pays our creator share in USDG.` },
+                { t: "Auto-buy", d: "Most of that USDG is swapped into tokenized Stock Tokens each cycle." },
                 { t: "Split", d: "50% to the reserve, 50% to this cycle's distribution pool." },
                 { t: "Claim", d: "Distributed to active miners by points earned. You claim your share." },
               ].map((s, i, arr) => (

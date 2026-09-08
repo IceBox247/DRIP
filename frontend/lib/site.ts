@@ -65,7 +65,7 @@ export const faqs = [
   },
   {
     q: "Where do the rewards come from?",
-    a: "Drip is launched on Pons. Pons collects the trade fee and pays our creator share in ETH. That ETH is used to buy tokenized Stock Tokens each cycle, which are distributed to active miners by points earned.",
+    a: "Drip is launched on Pons. Pons collects the trade fee and pays our creator share in USDG. That USDG is used to buy tokenized Stock Tokens each cycle, which are distributed to active miners by points earned.",
   },
   {
     q: "Do big holders take everything?",

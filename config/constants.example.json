@@ -20,15 +20,16 @@
   "internalSplit": {
     "autoBuyShareBps": 6667,
     "marketingShareBps": 3333,
-    "$comment": "How WE split the ETH creator fees Pons pays us (keeps the spec's 2:1 auto-buy:marketing intent). Shares are of RECEIVED creator fees and must sum to 10000. Marketing may double as ops treasury — DECISIONS.md #1."
+    "$comment": "How WE split the USDG creator fees Pons pays us (keeps the spec's 2:1 auto-buy:marketing intent). Shares are of RECEIVED creator fees and must sum to 10000. Marketing may double as ops treasury — DECISIONS.md #1."
   },
   "feeSource": {
     "launchpad": "pons",
     "mode": "push",
     "receive": "net",
-    "feeToken": "ETH",
+    "feeToken": "USDG",
+    "feeTokenAddress": null,
     "payoutWallet": null,
-    "$comment": "Pons delivery (DECISIONS.md #5, BLOCKERS.md #3). mode 'push': enable Pons automation to route creator fees to payoutWallet (we designate it); 'pull' would call Pons' claim entrypoint instead. receive 'net': Pons keeps its protocol cut before we receive (we do NOT forward anything). feeToken 'ETH': Pons V2 pays creator fees in ETH — the keeper swaps this to the Stock Token. Fill in payoutWallet before use."
+    "$comment": "Pons delivery (DECISIONS.md #5, BLOCKERS.md #3). mode 'push': enable Pons automation to route creator fees to payoutWallet (we designate it); 'pull' would call Pons' claim entrypoint instead. receive 'net': Pons keeps its protocol cut before we receive (we do NOT forward anything). feeToken 'USDG' is Global Dollar, Robinhood Chain's ERC-20 stablecoin — set feeTokenAddress to its on-chain address; the keeper swaps USDG to the Stock Token. Fill in payoutWallet before use."
   },
   "cycle": {
     "durationSeconds": 3600,

@@ -51,7 +51,7 @@ textbook definition of an **investment contract** (securities exposure). Stock T
 ## Dependency 3 — Pons fee economics (confirm on-chain before Phase 1)
 
 Launchpad is **Pons** (Robinhood Chain). The whole reward engine is funded by the **creator fees
-Pons pays us in ETH**. We build no fee collection of our own. Two things must be checked, because
+Pons pays us in USDG**. We build no fee collection of our own. Two things must be checked, because
 public sources conflict and Pons fee params are **immutable once set at launch**:
 
 **Confirm against Pons docs + on-chain:**
@@ -61,8 +61,8 @@ public sources conflict and Pons fee params are **immutable once set at launch**
       permits a fee that high and that it's worth the volume suppression. (DECISIONS.md #5)
 - [ ] **Split & immutability.** Read the exact creator/protocol split for our launch; it is
       snapshotted at launch and can never change. Get it right the first time.
-- [ ] **Currency.** Confirm creator fees are paid in **ETH** (Pons V2 default assumed here) — fixes
-      the keeper's swap path (ETH → Stock Token).
+- [ ] **Currency.** Creator fees are paid in **USDG** (Global Dollar, Robinhood Chain's ERC-20
+      stablecoin) — confirm for our launch. Fixes the keeper's swap path (USDG → Stock Token).
 - [ ] **Delivery.** Confirm Pons **automation can route creator fees to a payout wallet we
       designate** (push, no keys), vs. needing a manual/claim call (pull).
 - [ ] **Cadence.** Confirm claim/settlement cadence (Pons runs a per-token vault ~every 5 min).

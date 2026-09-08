@@ -8,8 +8,8 @@ Tokens bought by the fee engine.
 
 **Pons (the launchpad) collects the fee — we don't.** DRIP is a plain ERC-20 with no fee logic; no
 Uniswap hook, no tax-on-transfer on our side. Pons's venue takes the trade fee, keeps its protocol
-cut, and pays our **creator share in ETH** to a payout wallet we designate (via Pons automation).
-Our system distributes that ETH (~2/3 → Stock Tokens, ~1/3 → marketing/ops) and runs the reward
+cut, and pays our **creator share in USDG** to a payout wallet we designate (via Pons automation).
+Our system distributes that USDG (~2/3 → Stock Tokens, ~1/3 → marketing/ops) and runs the reward
 engine. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
 
 > **Fee-size caveat:** Pons's default nets the creator only ~0.7% of volume, not 3%. Netting ~3%
@@ -30,7 +30,7 @@ This project sits on top of hard gates. See [`docs/BLOCKERS.md`](./docs/BLOCKERS
 2. **Legal / securities exposure** — a bought token + a reward promise looks like an investment
    contract; Stock Tokens are blocked for US persons. **This repo is not legal advice.** Get counsel,
    structure offshore, geoblock US **before launch.**
-3. **Pons fee economics** — the reward engine is funded by Pons creator fees (ETH). Pons's default
+3. **Pons fee economics** — the reward engine is funded by Pons creator fees (USDG). Pons's default
    nets ~0.7% of volume, not 3%; the fee is **locked at launch**. Confirm the on-chain fee params
    and the volume tradeoff before launching.
 
