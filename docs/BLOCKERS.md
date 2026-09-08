@@ -8,23 +8,31 @@ as hard gates on Phase 3 (reward engine) and on any mainnet launch.
 ## Blocker 1 — Stock Token transferability (VERIFY FIRST)
 
 The entire reward payout depends on transferring Stock Tokens to **arbitrary user wallets**. Stock
-Tokens were **whitelist-gated** early on.
+Tokens were **whitelist-gated** early on, and the constraint is real: Robinhood stock tokens are
+**permissioned issuance** (you can't mint them; you only trade/LP against Robinhood's), holders
+generally must pass **KYC/eligibility for mint/redeem**, and — critically for us — **secondary DEX
+transfers can still carry allowlist behavior depending on the specific token.** Our RewardVault
+airdrops stock tokens to un-KYC'd user wallets, so this is the make-or-break question.
 
-**Gate:** Confirm on-chain that the target Stock Token is freely transferable before building the
-`RewardVault` / claim layer.
+Addresses are no longer the unknown — NVDA / AAPL / USDG / WETH are **verified on-chain** (see
+[ROBINHOOD-CHAIN.md](./ROBINHOOD-CHAIN.md)). The open question is purely **transfer freedom** of the
+chosen reward token to arbitrary wallets.
+
+**Gate:** Confirm on testnet that the target Stock Token transfers freely to a fresh, un-KYC'd wallet
+before building the `RewardVault` / claim layer.
 
 **Verification checklist:**
 
-- [ ] Identify the exact Stock Token contract address(es) on Robinhood Chain (couples to
-      [DECISIONS.md](./DECISIONS.md) #3).
-- [ ] Read the token contract: is there a transfer allowlist / whitelist / pause / KYC gate?
+- [x] Identify the exact Stock Token contract address(es) — verified on-chain (ROBINHOOD-CHAIN.md).
+- [ ] Read the token contract: transfer allowlist / whitelist / pause / KYC gate on `transfer` /
+      `transferFrom`? (Distinct from mint/redeem gating, which is expected.)
 - [ ] Test transfer to a fresh, un-whitelisted EOA on **testnet (46630)**. Does it succeed?
 - [ ] Confirm the `RewardVault` contract itself can hold and send the token (contracts sometimes
       blocked separately from EOAs).
-- [ ] If restricted: design a wrapper, or pick a different reward asset. **Do not proceed on the
-      current design until this is answered.**
+- [ ] If restricted: design a wrapper, or reward in USDG instead of a stock token, or pick a
+      different reward asset. **Do not proceed on the current design until this is answered.**
 
-**Status:** ⛔ Not verified.
+**Status:** ⛔ Not verified (addresses confirmed; transferability still open — the real risk).
 
 ---
 

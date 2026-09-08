@@ -69,6 +69,16 @@
   "chain": {
     "mainnetChainId": 4663,
     "testnetChainId": 46630,
-    "$comment": "Robinhood Chain. EVM, Arbitrum Orbit stack."
+    "mainnetRpc": "https://rpc.mainnet.chain.robinhood.com",
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeGas": "ETH",
+    "$comment": "Robinhood Chain. EVM, Arbitrum Orbit. chainId verified on-chain (0x1237=4663). Native gas is ETH; USDG is the stablecoin. See docs/ROBINHOOD-CHAIN.md."
+  },
+  "stockTokens": {
+    "$comment": "Official Robinhood-issued RWA/stock + base tokens on Robinhood Chain mainnet. Addresses + decimals VERIFIED on-chain via symbol()/decimals() eth_call (chainId 4663) on 2026-09-08. Do NOT mint your own stock token — permissioned issuance; you may only trade/LP against these. Confirm the full live list against Robinhood's registry API (https://api.robinhood.com/rhj/ metadata) + Blockscout before use, and re-verify at integration time.",
+    "USDG": { "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", "decimals": 6, "note": "Global Dollar stablecoin — base pair / fee currency" },
+    "WETH": { "address": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", "decimals": 18, "note": "wrapped ETH (gas token)" },
+    "NVDA": { "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", "decimals": 18, "note": "Nvidia stock token" },
+    "AAPL": { "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9", "decimals": 18, "note": "Apple stock token" }
   }
 }

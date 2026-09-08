@@ -12,6 +12,7 @@ that contradicts an unresolved decision here.
 | 4 | **Referral depth** — single-level or multi-level? | Single level | ❓ Open | — |
 | 5 | **Pons fee config** — total trade fee, creator/protocol split, currency, delivery. | Net ~3% to creator, USDG, push via Pons automation | 🔬 Decided-pending-verify | Launchpad = **Pons**. Deliver creator fees in **USDG** to our payout wallet via **push** automation; **net** (Pons keeps its cut). Target **~3% of volume net** to creator → needs a high per-launch fee (default nets ~0.7%). Verify on-chain params (immutable at launch) + volume impact. |
 | 6 | **Who deploys DRIP** — Pons deploys it as part of the launch, or we deploy a plain ERC-20 and list it? | Confirm with Pons | ❓ Open | — |
+| 7 | **DRIP's liquidity pair** — what does DRIP trade against? `DRIP/USDG` (stable market; rewards come purely from fees buying stock) vs. `DRIP/<stock>` paired-against-RWA (DRIP priced in a stock, Long/Bankr style). Determines what Pons can launch for us. | `DRIP/USDG` (matches current reward model) | ❓ Open | See docs/ROBINHOOD-CHAIN.md "Two ways DRIP can relate to stock tokens". |
 
 ## Notes
 
