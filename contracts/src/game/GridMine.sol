@@ -19,9 +19,10 @@ import {IRandomnessSource, IRandomnessConsumer} from "./interfaces/IRandomnessSo
 /// Economics per round (all tunable via constants):
 ///   - 1% of gross deploys → marketing/ops (`marketing`).
 ///   - Winners get their tile principal back + 90% of the loser pot, in USDG (pull payment).
-///   - The 10% loser-pot cut (USDG) is swapped to DRIP in the DRIP/USDG pool (Pons seeds it at
-///     launch), then that bought DRIP is split: 70% BURNED, 10% to stakers, 10% to this round's
-///     winners, 10% to the motherlode. On a 1/625 hit the motherlode is added to the winners' pool.
+///   - The 10% loser-pot cut (USDG) is apportioned: 70% BURNED, 10% stakers, 6% winners, 10%
+///     motherlode all buy DRIP (Pons seeds the DRIP/USDG pool at launch); the winners' remaining 4%
+///     buys NVDA (tokenized NVIDIA). On a 1/625 hit the motherlode is added to the winners' DRIP.
+///     The DRIP and NVDA rewards share the same 1-or-all flip (NVDA has no motherlode).
 ///   - Winner DRIP accrues in the RefiningVault; claiming it costs a 10% refine tax paid to holders
 ///     who haven't claimed (ORE mechanic).
 ///
@@ -37,11 +38,14 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     uint16 public constant ADMIN_BPS = 100; // 1% of gross → marketing/ops
     uint16 public constant CUT_BPS = 1000; // 10% of loser pot → buy DRIP (reward engine)
     uint16 public constant BPS = 10_000;
-    // Split of the bought DRIP:
-    uint16 public constant BURN_BPS = 7000; // 70% burned
-    uint16 public constant STAKERS_BPS = 1000; // 10% to stakers
-    uint16 public constant WINNERS_BPS = 1000; // 10% to this round's winners
-    // motherlode gets the remainder (10%)
+    // Split of the 10% cut (bps of the cut). Most buys DRIP; the winners' slice is paid 6% as DRIP
+    // + 4% as NVDA (tokenized NVIDIA), bought from the cut. Burn/stakers/motherlode unchanged.
+    uint16 public constant BURN_BPS = 7000; // 70% → buys DRIP, burned
+    uint16 public constant STAKERS_BPS = 1000; // 10% → buys DRIP, to stakers
+    uint16 public constant WINNERS_BPS = 600; // 6% → buys DRIP, to this round's winners
+    uint16 public constant MOTHERLODE_BPS = 1000; // 10% → buys DRIP, to the motherlode
+    uint16 public constant WINNERS_NVDA_BPS = 400; // 4% → buys NVDA, to this round's winners
+    uint16 public constant DRIP_BPS = 9600; // BURN+STAKERS+WINNERS+MOTHERLODE: the DRIP portion of the cut
     uint16 public constant MOTHERLODE_ODDS = 625; // 1/625
     uint16 public constant SOLO_ODDS = 2; // 1/2: 50% one winner takes the DRIP, 50% shared
 
@@ -58,8 +62,9 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         uint256 totalIn; // gross USDG
         uint256 winnerStake; // USDG on the winning tile
         uint256 winnerPotUsdg; // 90% of loser pot → winners (USDG), always pro-rata
-        uint256 cutUsdg; // 10% of loser pot → swap to DRIP
+        uint256 cutUsdg; // 10% of loser pot → swap to DRIP (+ NVDA slice)
         uint256 rewardDrip; // winner DRIP for the round (set at processRewards), held in RefiningVault
+        uint256 rewardNvda; // winner NVDA for the round (4% slice), held in this contract
     }
 
     /// @dev Cumulative stake segments per tile, for weighted single-winner selection without a loop.
@@ -72,6 +77,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
 
     IERC20 public immutable usdg;
     IERC20 public immutable drip;
+    IERC20 public immutable nvda; // tokenized NVIDIA — the winners' 4% stock reward
     RefiningVault public immutable refining;
     StakeVault public immutable stakeVault;
     ISwapRouter public immutable router;
@@ -89,6 +95,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     mapping(uint256 => mapping(uint8 => Seg[])) private _segs; // round => tile => cumulative segments
     mapping(uint256 => mapping(address => bool)) public usdgClaimed;
     mapping(uint256 => mapping(address => bool)) public dripClaimed;
+    mapping(uint256 => mapping(address => bool)) public nvdaClaimed;
 
     event RoundOpened(uint256 indexed round, uint256 startTime);
     event Deployed(uint256 indexed round, address indexed player, uint8 tile, uint256 amount);
@@ -98,6 +105,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     event RewardsProcessed(uint256 indexed round, uint256 usdgIn, uint256 dripBought, uint256 burned, uint256 toStakers, uint256 toWinners);
     event HarvestedUsdg(uint256 indexed round, address indexed player, uint256 usdgOut);
     event HarvestedDrip(uint256 indexed round, address indexed player, uint256 dripOut);
+    event HarvestedNvda(uint256 indexed round, address indexed player, uint256 nvdaOut);
     event PausedSet(bool paused);
 
     error BadTile();
@@ -117,6 +125,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     constructor(
         IERC20 usdg_,
         IERC20 drip_,
+        IERC20 nvda_,
         RefiningVault refining_,
         StakeVault stakeVault_,
         ISwapRouter router_,
@@ -126,6 +135,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     ) Ownable(owner_) {
         usdg = usdg_;
         drip = drip_;
+        nvda = nvda_;
         refining = refining_;
         stakeVault = stakeVault_;
         router = router_;
@@ -210,9 +220,10 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         emit Settled(round, tile, r.winnerPotUsdg, r.cutUsdg, r.motherlodeHit);
     }
 
-    /// @notice Buy DRIP with the round's 10% cut and distribute it (burn/stakers/winners/motherlode).
-    ///         Permissionless; the keeper passes `minDripOut` (from a quoter) for slippage safety.
-    function processRewards(uint256 round, uint256 minDripOut) external nonReentrant {
+    /// @notice Buy DRIP (and the winners' NVDA slice) with the round's 10% cut and distribute it
+    ///         (burn/stakers/winners-DRIP/motherlode + winners-NVDA). Permissionless; the keeper passes
+    ///         `minDripOut` and `minNvdaOut` (from a quoter) for slippage safety.
+    function processRewards(uint256 round, uint256 minDripOut, uint256 minNvdaOut) external nonReentrant {
         Round storage r = rounds[round];
         if (r.status != Status.Settled) revert NotSettled();
         if (r.rewardsProcessed) revert AlreadyProcessed();
@@ -224,20 +235,27 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
             return;
         }
 
-        usdg.forceApprove(address(router), cut);
-        uint256 bought = router.swapExactIn(address(usdg), address(drip), cut, minDripOut);
-
         if (r.winnerStake == 0) {
-            // No winners: burn everything bought.
-            IBurnable(address(drip)).burn(bought);
-            emit RewardsProcessed(round, cut, bought, bought, 0, 0);
+            // No winners: no NVDA slice — swap the whole cut to DRIP and burn it.
+            usdg.forceApprove(address(router), cut);
+            uint256 boughtAll = router.swapExactIn(address(usdg), address(drip), cut, minDripOut);
+            IBurnable(address(drip)).burn(boughtAll);
+            emit RewardsProcessed(round, cut, boughtAll, boughtAll, 0, 0);
             return;
         }
 
-        uint256 burnAmt = (bought * BURN_BPS) / BPS;
-        uint256 stakersAmt = (bought * STAKERS_BPS) / BPS;
-        uint256 winnersAmt = (bought * WINNERS_BPS) / BPS;
-        uint256 motherAmt = bought - burnAmt - stakersAmt - winnersAmt; // remainder (~10%)
+        // Carve out the winners' 4% NVDA slice; the remaining 96% of the cut buys DRIP.
+        uint256 nvdaUsdg = (cut * WINNERS_NVDA_BPS) / BPS;
+        uint256 dripUsdg = cut - nvdaUsdg;
+
+        usdg.forceApprove(address(router), dripUsdg);
+        uint256 bought = router.swapExactIn(address(usdg), address(drip), dripUsdg, minDripOut);
+
+        // Split the bought DRIP by weight within the DRIP portion (BURN+STAKERS+WINNERS+MOTHERLODE).
+        uint256 burnAmt = (bought * BURN_BPS) / DRIP_BPS;
+        uint256 stakersAmt = (bought * STAKERS_BPS) / DRIP_BPS;
+        uint256 winnersAmt = (bought * WINNERS_BPS) / DRIP_BPS;
+        uint256 motherAmt = bought - burnAmt - stakersAmt - winnersAmt; // remainder
 
         IBurnable(address(drip)).burn(burnAmt);
 
@@ -254,6 +272,12 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         }
         r.rewardDrip = reward;
         if (reward > 0) drip.safeTransfer(address(refining), reward);
+
+        // Buy the winners' NVDA and park it here for harvest (1-or-all like the DRIP; no motherlode).
+        if (nvdaUsdg > 0) {
+            usdg.forceApprove(address(router), nvdaUsdg);
+            r.rewardNvda = router.swapExactIn(address(usdg), address(nvda), nvdaUsdg, minNvdaOut);
+        }
 
         emit RewardsProcessed(round, cut, bought, burnAmt, stakersAmt, reward);
     }
@@ -285,6 +309,18 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
             if (dripOut > 0) refining.credit(msg.sender, dripOut); // accrues; claim charges refine tax
             emit HarvestedDrip(round, msg.sender, dripOut);
             did = true;
+        }
+        if (r.rewardsProcessed && !nvdaClaimed[round][msg.sender]) {
+            nvdaClaimed[round][msg.sender] = true;
+            // NVDA follows the same 1-or-all as the DRIP (no motherlode), paid directly (no refine tax).
+            uint256 nvdaOut = r.soloMode
+                ? (msg.sender == r.soloWinner ? r.rewardNvda : 0)
+                : (r.rewardNvda * s) / winnerStake;
+            if (nvdaOut > 0) {
+                nvda.safeTransfer(msg.sender, nvdaOut);
+                emit HarvestedNvda(round, msg.sender, nvdaOut);
+                did = true;
+            }
         }
         if (!did) revert NothingToHarvest();
     }

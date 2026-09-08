@@ -6,6 +6,7 @@ import {DripToken} from "../../src/game/DripToken.sol";
 import {GridMine} from "../../src/game/GridMine.sol";
 import {RefiningVault} from "../../src/game/RefiningVault.sol";
 import {StakeVault} from "../../src/game/StakeVault.sol";
+import {MockERC20} from "../../src/game/mocks/MockERC20.sol";
 import {MockRandomness} from "../../src/game/mocks/MockRandomness.sol";
 import {MockSwapRouter} from "../../src/game/mocks/MockSwapRouter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -41,18 +42,20 @@ contract ForkUSDGTest is Test {
         assertEq(IERC20Metadata(USDG).decimals(), 6, "real USDG");
 
         DripToken drip = new DripToken(3_000_000 ether, address(this));
+        MockERC20 nvda = new MockERC20("NVIDIA", "NVDA", 18);
         MockRandomness rand = new MockRandomness();
         MockSwapRouter router = new MockSwapRouter();
         router.setRate(1e16); // 6dp USDG → 18dp DRIP ~1:1
         StakeVault stakeVault = new StakeVault(IERC20(address(drip)));
         RefiningVault refining = new RefiningVault(IERC20(address(drip)), feeSink);
         GridMine gridMine = new GridMine(
-            IERC20(USDG), IERC20(address(drip)), refining, stakeVault, ISwapRouter(address(router)),
-            IRandomnessSource(address(rand)), marketing, address(this)
+            IERC20(USDG), IERC20(address(drip)), IERC20(address(nvda)), refining, stakeVault,
+            ISwapRouter(address(router)), IRandomnessSource(address(rand)), marketing, address(this)
         );
         refining.setGridMine(address(gridMine));
         rand.setConsumer(address(gridMine));
         drip.transfer(address(router), 1_000 ether); // seed mock pool
+        nvda.mint(address(router), 1_000 ether); // seed NVDA liquidity for the winners' 4% slice
 
         uint256 U = 1e6;
         deal(USDG, alice, 1000 * U);
@@ -74,7 +77,7 @@ contract ForkUSDGTest is Test {
         rand.setWord(65557); // tile 7, shared (not solo)
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();
-        gridMine.processRewards(1, 0);
+        gridMine.processRewards(1, 0, 0);
 
         assertEq(gridMine.adminAccrued(), 45 * U / 10, "1% entry fees = 4.5 real USDG");
         gridMine.withdrawMarketing();
@@ -83,7 +86,8 @@ contract ForkUSDGTest is Test {
         vm.prank(alice);
         gridMine.harvest(1);
         assertEq(IERC20(USDG).balanceOf(alice) - aBefore, 210375 * U / 1000, "alice 210.375 real USDG");
-        assertEq(refining.claimable(alice), 12375 * 1e14, "alice DRIP 1.2375 (bought, not minted)");
+        assertEq(refining.claimable(alice), 7425 * 1e14, "alice DRIP 0.7425 (bought, not minted)");
+        assertEq(nvda.balanceOf(alice), 495 * 1e15, "alice NVDA 0.495 (bought from the 4% slice)");
         emit log_named_uint("alice real-USDG payout (6dp)", IERC20(USDG).balanceOf(alice) - aBefore);
     }
 }

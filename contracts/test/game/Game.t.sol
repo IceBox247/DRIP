@@ -16,6 +16,7 @@ import {IRandomnessSource} from "../../src/game/interfaces/IRandomnessSource.sol
 contract GameTest is Test {
     MockERC20 usdg;
     DripToken drip;
+    MockERC20 nvda;
     MockRandomness rand;
     RefiningVault refining;
     StakeVault stakeVault;
@@ -35,18 +36,20 @@ contract GameTest is Test {
     function setUp() public {
         usdg = new MockERC20("Global Dollar", "USDG", 6);
         drip = new DripToken(3_000_000 ether, address(this)); // fixed supply → this test holds it
+        nvda = new MockERC20("NVIDIA", "NVDA", 18);
         rand = new MockRandomness();
         router = new MockSwapRouter();
         router.setRate(RATE);
         stakeVault = new StakeVault(IERC20(address(drip)));
         refining = new RefiningVault(IERC20(address(drip)), feeSink);
         gridMine = new GridMine(
-            IERC20(address(usdg)), IERC20(address(drip)), refining, stakeVault, ISwapRouter(address(router)),
-            IRandomnessSource(address(rand)), marketing, address(this)
+            IERC20(address(usdg)), IERC20(address(drip)), IERC20(address(nvda)), refining, stakeVault,
+            ISwapRouter(address(router)), IRandomnessSource(address(rand)), marketing, address(this)
         );
         refining.setGridMine(address(gridMine));
         rand.setConsumer(address(gridMine));
         drip.transfer(address(router), 1_000 ether); // seed the swap pool (mock)
+        nvda.mint(address(router), 1_000 ether); // seed NVDA liquidity for the winners' 4% slice
 
         usdg.mint(alice, 1000 * U);
         usdg.mint(bob, 1000 * U);
@@ -81,24 +84,26 @@ contract GameTest is Test {
 
         // Buy DRIP with the cut + distribute (keeper step).
         uint256 supplyBefore = drip.totalSupply();
-        gridMine.processRewards(1, 0);
+        gridMine.processRewards(1, 0, 0);
 
-        // 24.75 USDG → 24.75 DRIP. Split: 70% burn=17.325, 10% stakers=2.475, 10% winners=2.475,
-        // 10% motherlode=2.475.
+        // Cut 24.75 USDG apportioned: 70% burn=17.325, 10% stakers=2.475, 10% motherlode=2.475,
+        // 6% winners-DRIP=1.485 (buys DRIP from 96% = 23.76 USDG); 4% winners-NVDA=0.99 USDG → 0.99 NVDA.
         assertEq(drip.balanceOf(address(stakeVault)), 2475 * 1e15, "stakers 2.475 DRIP");
         assertEq(gridMine.motherlodeDrip(), 2475 * 1e15, "motherlode 2.475 DRIP");
         assertEq(supplyBefore - drip.totalSupply(), 17325 * 1e15, "burned 17.325 DRIP");
 
-        // Harvest USDG then DRIP.
+        // Harvest USDG then DRIP + NVDA.
         uint256 aBefore = usdg.balanceOf(alice);
         vm.prank(alice);
-        gridMine.harvest(1); // pays USDG + credits DRIP (rewards already processed)
+        gridMine.harvest(1); // pays USDG + credits DRIP + pays NVDA (rewards already processed)
         assertEq(usdg.balanceOf(alice) - aBefore, 210375 * U / 1000, "alice USDG 210.375 (net principal + pot)");
-        assertEq(refining.claimable(alice), 12375 * 1e14, "alice DRIP 1.2375 (half of 2.475)");
+        assertEq(refining.claimable(alice), 7425 * 1e14, "alice DRIP 0.7425 (half of 1.485)");
+        assertEq(nvda.balanceOf(alice), 495 * 1e15, "alice NVDA 0.495 (half of 0.99)");
 
         vm.prank(bob);
         gridMine.harvest(1);
-        assertEq(refining.claimable(bob), 12375 * 1e14, "bob DRIP 1.2375");
+        assertEq(refining.claimable(bob), 7425 * 1e14, "bob DRIP 0.7425");
+        assertEq(nvda.balanceOf(bob), 495 * 1e15, "bob NVDA 0.495");
     }
 
     function test_soloWinnerTakesAllDrip() public {
@@ -120,15 +125,17 @@ contract GameTest is Test {
         assertTrue(r.soloMode, "solo mode");
         assertEq(r.soloWinner, alice, "alice is the weighted solo winner (ticket 0)");
 
-        gridMine.processRewards(1, 0);
+        gridMine.processRewards(1, 0, 0);
         vm.prank(alice);
         gridMine.harvest(1);
         vm.prank(bob);
         gridMine.harvest(1);
 
-        // DRIP: alice gets it all (2.475), bob none. USDG pot still shared (both staked net 99).
-        assertEq(refining.claimable(alice), 2475 * 1e15, "alice takes all DRIP");
+        // DRIP + NVDA: alice gets it all (1.485 DRIP, 0.99 NVDA), bob none. USDG pot still shared.
+        assertEq(refining.claimable(alice), 1485 * 1e15, "alice takes all DRIP");
+        assertEq(nvda.balanceOf(alice), 99 * 1e16, "alice takes all NVDA (0.99)");
         assertEq(refining.claimable(bob), 0, "bob gets no DRIP in solo mode");
+        assertEq(nvda.balanceOf(bob), 0, "bob gets no NVDA in solo mode");
         assertEq(usdg.balanceOf(bob), (1000 - 300) * U + 210375 * U / 1000, "bob still gets USDG pot share");
     }
 
@@ -141,7 +148,7 @@ contract GameTest is Test {
         rand.setWord(65557); // tile 7
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();
-        gridMine.processRewards(1, 0);
+        gridMine.processRewards(1, 0, 0);
         vm.prank(alice);
         gridMine.harvest(1);
         assertEq(usdg.balanceOf(alice), 999 * U, "alone + won: net stake back (only the 1% entry fee)");
@@ -160,7 +167,7 @@ contract GameTest is Test {
         rand.setWord(6407);
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();
-        gridMine.processRewards(1, 0);
+        gridMine.processRewards(1, 0, 0);
         assertLe(drip.totalSupply(), supply0, "supply never increases");
     }
 

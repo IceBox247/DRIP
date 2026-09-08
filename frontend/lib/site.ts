@@ -37,13 +37,18 @@ export const gridMine = {
   deployAsset: "USDG",
   adminFeeBps: 100, // 1% of gross → marketing/ops
   loserCutBps: 1000, // 10% of loser pot → buys DRIP
-  cutSplitBurnBps: 7000, // of the bought DRIP: 70% burned
-  cutSplitStakersBps: 1000, // 10% to stakers
-  cutSplitWinnersBps: 1000, // 10% to this round's winners
-  cutSplitMotherlodeBps: 1000, // 10% to the motherlode
+  // Split of the 10% cut (fractions of the cut). Most buys DRIP; the winners' slice is now paid
+  // 6% as DRIP + 4% as NVDA (bought from the cut). Burn/stakers/motherlode unchanged.
+  cutSplitBurnBps: 7000, // 70% → buys DRIP, burned
+  cutSplitStakersBps: 1000, // 10% → buys DRIP, to stakers
+  cutSplitWinnersBps: 600, // 6% → buys DRIP, to this round's winners
+  cutSplitWinnersNvdaBps: 400, // 4% → buys NVDA, to this round's winners (1-or-all)
+  cutSplitMotherlodeBps: 1000, // 10% → buys DRIP, to the motherlode
   motherlodeOdds: 625, // 1 / 625
-  soloOdds: 2, // 1-or-all: 50% one winner takes the DRIP, 50% shared
-  refineFeeBps: 1000, // 10% claim tax → unclaimed holders
+  soloOdds: 2, // 1-or-all: 50% one winner takes the DRIP/NVDA, 50% shared
+  refineFeeBps: 1000, // 10% claim tax on DRIP → unclaimed holders
+  winnerStockAsset: "NVDA", // tokenized NVIDIA on Robinhood Chain
+  nvdaPrice: 176, // demo NVDA price in USDG (display only)
 } as const;
 
 export const stats = [

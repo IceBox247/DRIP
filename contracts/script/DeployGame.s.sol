@@ -30,6 +30,7 @@ contract DeployGame is Script {
     function run() external {
         address deployer = msg.sender;
         address usdg = vm.envOr("USDG", address(0));
+        address nvda = vm.envOr("NVDA", address(0));
         address swapRouter = vm.envOr("SWAP_ROUTER", address(0));
         address randomness = vm.envOr("RANDOMNESS", address(0));
         address marketing = vm.envOr("MARKETING", deployer);
@@ -41,6 +42,10 @@ contract DeployGame is Script {
         if (usdg == address(0)) {
             usdg = address(new MockERC20("Global Dollar (mock)", "USDG", 6));
             console2.log("MockERC20 USDG:", usdg);
+        }
+        if (nvda == address(0)) {
+            nvda = address(new MockERC20("NVIDIA (mock)", "NVDA", 18));
+            console2.log("MockERC20 NVDA:", nvda);
         }
         bool mockRouter = swapRouter == address(0);
         if (mockRouter) {
@@ -57,15 +62,19 @@ contract DeployGame is Script {
         StakeVault stakeVault = new StakeVault(IERC20(address(drip)));
         RefiningVault refining = new RefiningVault(IERC20(address(drip)), feeSink);
         GridMine gridMine = new GridMine(
-            IERC20(usdg), IERC20(address(drip)), refining, stakeVault, ISwapRouter(swapRouter),
+            IERC20(usdg), IERC20(address(drip)), IERC20(nvda), refining, stakeVault, ISwapRouter(swapRouter),
             IRandomnessSource(randomness), marketing, deployer
         );
 
         refining.setGridMine(address(gridMine));
         if (mockRng) MockRandomness(randomness).setConsumer(address(gridMine));
-        // Seed the MOCK router with DRIP so per-round buys have liquidity in testing. On mainnet the
-        // router is the real Pons/Uniswap-v4 pool — do NOT do this.
-        if (mockRouter) drip.transfer(swapRouter, cap / 10);
+        // Seed the MOCK router with DRIP + NVDA so per-round buys have liquidity in testing. On mainnet
+        // the router is the real Pons/Uniswap-v4 pool — do NOT do this.
+        if (mockRouter) {
+            drip.transfer(swapRouter, cap / 10);
+            // Mint mock NVDA liquidity to the router (real NVDA is a fixed on-chain token).
+            try MockERC20(nvda).mint(swapRouter, 1_000_000 ether) {} catch {}
+        }
 
         vm.stopBroadcast();
 

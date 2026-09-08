@@ -80,7 +80,8 @@ export default function ExplorePage() {
           <Stat label="DRIP bought" value={`${fmt(12840)} DRIP`} sub="cut → buyback" />
           <Stat label="Burned" value={`${fmt(8988)} DRIP`} sub="70%" />
           <Stat label="To stakers" value={`${fmt(1284)} DRIP`} sub="10%" />
-          <Stat label="To winners" value={`${fmt(2568)} DRIP`} sub="10% win + 10% motherlode" />
+          <Stat label="To winners" value={`${fmt(2054)} DRIP`} sub="6% DRIP + 10% motherlode" />
+          <Stat label="NVDA to winners" value="4.86 NVDA" sub="4% of the cut → tokenized NVIDIA" />
         </Grid>
       </Section>
 

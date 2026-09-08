@@ -8,6 +8,7 @@ export const metadata = { title: "About — Drip" };
 const burn = gridMine.cutSplitBurnBps / 100;
 const stakers = gridMine.cutSplitStakersBps / 100;
 const winners = gridMine.cutSplitWinnersBps / 100;
+const winnersNvda = gridMine.cutSplitWinnersNvdaBps / 100;
 const mother = gridMine.cutSplitMotherlodeBps / 100;
 
 export default function AboutPage() {
@@ -70,10 +71,11 @@ export default function AboutPage() {
           <p>DRIP holders can stake to earn yield from protocol revenue.</p>
           <h3 className="mt-4 text-base font-semibold text-white">How it works</h3>
           <p className="mt-1.5">
-            {gridMine.loserCutBps / 100}% of each round&rsquo;s loser pot is collected as protocol revenue and used
-            to buy DRIP off the open market. Of the DRIP bought, {burn}% is burned, {winners}% goes to that
-            round&rsquo;s winners, {mother}% grows the motherlode, and {stakers}% is streamed to stakers as yield —
-            so stakers earn from both the buy pressure and the revenue share.
+            {gridMine.loserCutBps / 100}% of each round&rsquo;s loser pot is collected as protocol revenue. Of that
+            cut, {burn}% buys DRIP and burns it, {stakers}% buys DRIP for stakers, {mother}% grows the motherlode,
+            {" "}{winners}% buys DRIP for that round&rsquo;s winners, and {winnersNvda}% buys{" "}
+            <span className="text-white">NVDA</span> (tokenized NVIDIA) for the winners — so each round pays winners
+            in both DRIP and stock, and stakers earn from both the buy pressure and the revenue share.
           </p>
         </Section>
 
@@ -90,10 +92,12 @@ export default function AboutPage() {
           <ul className="mt-1.5 space-y-1.5">
             {[
               `${gridMine.adminFeeBps / 100}% of each deploy → marketing/ops (skimmed at deploy, before the pool).`,
-              `${gridMine.loserCutBps / 100}% of each loser pot → buys DRIP (the buyback).`,
-              `${stakers}% of bought DRIP → stakers as yield.`,
-              `${winners}% of bought DRIP → the round's winners.`,
-              `${burn}% of bought DRIP → burned.`,
+              `${gridMine.loserCutBps / 100}% of each loser pot → the cut (buyback).`,
+              `${burn}% of the cut → buys DRIP, burned.`,
+              `${stakers}% of the cut → buys DRIP for stakers.`,
+              `${mother}% of the cut → buys DRIP for the motherlode.`,
+              `${winners}% of the cut → buys DRIP for the round's winners.`,
+              `${winnersNvda}% of the cut → buys NVDA for the round's winners.`,
               `${gridMine.refineFeeBps / 100}% refining fee on claimed DRIP → unclaimed holders.`,
             ].map((f) => (
               <li key={f} className="flex gap-2.5">

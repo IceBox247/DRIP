@@ -60,14 +60,20 @@ that cadence is the product.
 the USDG cut, so each round is net buy pressure on DRIP. The whole supply is created once at deploy
 and handed to the Pons launch, which seeds the DRIP/USDG pool the game trades against.
 
-Per round, the 10% USDG cut is swapped to DRIP and split (of the bought DRIP):
+Per round, the 10% USDG cut is apportioned. Most buys DRIP; the winners' slice is paid **6% as DRIP
++ 4% as NVDA** (tokenized NVIDIA), bought from the cut:
 
-| Slice | % of bought DRIP | Goes to |
-|---|---|---|
-| Burn | 70% | burned ("bond"/bury) — deflationary |
-| Stakers | 10% | `StakeVault` |
-| Winners | 10% | this round's winners (via `RefiningVault`) |
-| Motherlode | 10% | jackpot pool; dumps to winners on a 1/625 hit |
+| Slice | % of the cut | Buys | Goes to |
+|---|---|---|---|
+| Burn | 70% | DRIP | burned ("bond"/bury) — deflationary |
+| Stakers | 10% | DRIP | `StakeVault` |
+| Motherlode | 10% | DRIP | jackpot pool; dumps to winners on a 1/625 hit |
+| Winners — DRIP | 6% | DRIP | this round's winners (via `RefiningVault`) |
+| Winners — NVDA | 4% | **NVDA** | this round's winners (held in GridMine, paid on harvest) |
+
+**Winners get stock too.** The 4% NVDA slice follows the **same 1-or-all flip** as the DRIP (solo →
+one weighted winner takes both; shared → pro-rata), but NVDA has **no motherlode** and **no refine
+tax** — it's paid directly on harvest. No-winner rounds have no NVDA slice (the whole pool burns).
 
 This replaces ORE's "mint 1 token/round." Marketing is funded separately by the **1% admin fee**, not
 from this cut. Requires the DRIP/USDG pool to exist (Pons provides it at launch) — the swap is
@@ -130,10 +136,11 @@ commit–reveal); tests use `MockRandomness`. v2 splits winner DRIP pro-rata (no
 | Deploy asset | USDG |
 | DRIP supply | fixed (no mint) |
 | Admin fee | 1% of gross → marketing/ops |
-| Protocol cut | 10% of loser pot → buys DRIP |
-| Bought-DRIP split | 70% burn / 10% stakers / 10% winners / 10% motherlode |
+| Protocol cut | 10% of loser pot → buys DRIP (+ winners' NVDA slice) |
+| Cut split | 70% burn / 10% stakers / 10% motherlode / 6% winners-DRIP / 4% winners-NVDA |
+| Winner stock | NVDA (tokenized NVIDIA) — 4% of the cut, 1-or-all, no motherlode/refine tax |
 | Motherlode hit | 1/625 |
-| Refining (claim) tax | 10% → unclaimed holders |
+| Refining (claim) tax | 10% on DRIP → unclaimed holders |
 
 Verified end-to-end against **real USDG** on a Robinhood mainnet fork (`test/game/ForkUSDG.t.sol`).
 

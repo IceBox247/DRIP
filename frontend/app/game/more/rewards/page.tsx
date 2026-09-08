@@ -5,10 +5,11 @@ import { gridMine } from "@/lib/site";
 export const metadata = { title: "Rewards — Drip" };
 
 const drip = [
-  { pct: gridMine.cutSplitBurnBps / 100, label: "Burned", note: "deflationary — helps every holder", color: "bg-red-400" },
-  { pct: gridMine.cutSplitStakersBps / 100, label: "Stakers", note: "StakeVault — stake DRIP to earn it", color: "bg-lime" },
-  { pct: gridMine.cutSplitWinnersBps / 100, label: "Winners", note: "this round's winners (via refining)", color: "bg-cyan-400" },
-  { pct: gridMine.cutSplitMotherlodeBps / 100, label: "Motherlode", note: `jackpot — 1/${gridMine.motherlodeOdds} dumps to winners`, color: "bg-yellow-500" },
+  { pct: gridMine.cutSplitBurnBps / 100, label: "Burned (DRIP)", note: "deflationary — helps every holder", color: "bg-red-400" },
+  { pct: gridMine.cutSplitStakersBps / 100, label: "Stakers (DRIP)", note: "StakeVault — stake DRIP to earn it", color: "bg-lime" },
+  { pct: gridMine.cutSplitMotherlodeBps / 100, label: "Motherlode (DRIP)", note: `jackpot — 1/${gridMine.motherlodeOdds} dumps to winners`, color: "bg-yellow-500" },
+  { pct: gridMine.cutSplitWinnersBps / 100, label: "Winners — DRIP", note: "this round's winners (1-or-all, via refining)", color: "bg-cyan-400" },
+  { pct: gridMine.cutSplitWinnersNvdaBps / 100, label: "Winners — NVDA", note: "buys tokenized NVIDIA for winners (1-or-all)", color: "bg-violet-400" },
 ];
 
 export default function RewardsPage() {
@@ -26,19 +27,21 @@ export default function RewardsPage() {
           </p>
         </Card>
 
-        <Card title="The 10% cut buys DRIP, then splits">
+        <Card title="The 10% cut, split">
           <Split rows={drip} />
           <p className="mt-3 text-xs text-mute">
-            DRIP is fixed-supply and never minted — every reward is <span className="text-white">bought</span> from the
-            market, so each round is net buy pressure.
+            Most of the cut buys DRIP (fixed-supply, never minted — every reward is
+            <span className="text-white"> bought</span> from the market). The winners&rsquo; 4% slice buys{" "}
+            <span className="text-white">NVDA</span> (tokenized NVIDIA) instead, so each round pays winners in both
+            DRIP and stock.
           </p>
         </Card>
 
         <Card title="1-or-all">
           <p className="text-sm text-mute">
-            The USDG pot is <span className="text-white">always</span> pro-rata. The round&rsquo;s DRIP flips a coin:
-            <span className="text-white"> 50%</span> one weighted winner takes it all (incl. the motherlode),
-            <span className="text-white"> 50%</span> everyone on the tile shares.
+            The USDG pot is <span className="text-white">always</span> pro-rata. The round&rsquo;s DRIP and NVDA flip a
+            coin together: <span className="text-white">50%</span> one weighted winner takes it all (incl. the
+            motherlode), <span className="text-white">50%</span> everyone on the tile shares.
           </p>
         </Card>
 

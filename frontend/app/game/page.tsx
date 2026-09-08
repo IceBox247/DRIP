@@ -33,12 +33,13 @@ export default function MinePage() {
   const [usdg, setUsdg] = useState(START_USDG);
   const [unrefined, setUnrefined] = useState(0);
   const [claimed, setClaimed] = useState(0);
+  const [nvda, setNvda] = useState(0); // tokenized NVIDIA won (4% refining slice, 1-or-all)
   const [motherlode, setMotherlode] = useState(26);
   const [adminFees, setAdminFees] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [round, setRound] = useState(397203);
   const [last, setLast] = useState<{ tile: number; solo: boolean } | null>({ tile: 13, solo: false });
-  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
+  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; nvda: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
   const [sparkles] = useState<boolean[]>(() => Array.from({ length: N }, () => Math.random() < 0.4));
 
   const pool = useMemo(() => tiles.reduce((s, t) => s + t.mine + t.others, 0), [tiles]);
@@ -73,26 +74,35 @@ export default function MinePage() {
     const winnerStake = tiles[tile].mine + tiles[tile].others;
     const mine = tiles[tile].mine;
     const loserStake = gross - winnerStake;
-    let usdgDelta = 0, drip = 0, solo = false, soloYou = false, motherlodeHit = false;
+    let usdgDelta = 0, drip = 0, nvda = 0, solo = false, soloYou = false, motherlodeHit = false;
     if (winnerStake > 0) {
       const cut = (loserStake * gridMine.loserCutBps) / 10000;
       const winnerPot = loserStake - cut;
       if (mine > 0) usdgDelta = mine + (winnerPot * mine) / winnerStake;
       const winnersDrip = (cut * gridMine.cutSplitWinnersBps) / 10000;
       const motherAdd = (cut * gridMine.cutSplitMotherlodeBps) / 10000;
+      // Winners' 4% slice buys NVDA; converted to shares at the demo price.
+      const nvdaPool = ((cut * gridMine.cutSplitWinnersNvdaBps) / 10000) / gridMine.nvdaPrice;
       let payoutPool = winnersDrip;
       const next = motherlode + motherAdd;
       if (Math.random() * gridMine.motherlodeOdds < 1) { motherlodeHit = true; payoutPool += next; setMotherlode(0); }
       else setMotherlode(Math.round(next * 100) / 100);
       solo = Math.random() < 1 / gridMine.soloOdds;
       if (mine > 0) {
-        if (solo) { soloYou = Math.random() < mine / winnerStake; drip = soloYou ? payoutPool : 0; }
-        else drip = (payoutPool * mine) / winnerStake;
+        if (solo) {
+          soloYou = Math.random() < mine / winnerStake; // NVDA follows the same 1-or-all as DRIP
+          drip = soloYou ? payoutPool : 0;
+          nvda = soloYou ? nvdaPool : 0;
+        } else {
+          drip = (payoutPool * mine) / winnerStake;
+          nvda = (nvdaPool * mine) / winnerStake;
+        }
       }
     }
     if (usdgDelta > 0) setUsdg((u) => Math.round((u + usdgDelta) * 100) / 100);
     if (drip > 0) setUnrefined((d) => Math.round((d + drip) * 1e6) / 1e6);
-    setResult({ tile, won: usdgDelta > 0, usdgDelta, drip, solo, soloYou, motherlodeHit });
+    if (nvda > 0) setNvda((n) => Math.round((n + nvda) * 1e6) / 1e6);
+    setResult({ tile, won: usdgDelta > 0, usdgDelta, drip, nvda, solo, soloYou, motherlodeHit });
     setLast({ tile, solo });
   }, [tiles, motherlode]);
 
@@ -162,9 +172,18 @@ export default function MinePage() {
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
           <div className="font-semibold text-white">Round #{round} — tile {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
           <div className="mt-1">
-            {result.won
-              ? `+${fmt(result.usdgDelta)} USDG` + (result.solo ? (result.soloYou ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP 🏆` : " · solo round (DRIP went to one winner)") : ` · +${fmt(result.drip, 3)} DRIP`)
-              : "You had no stake on the winning tile."}
+            {result.won ? (
+              <>
+                {`+${fmt(result.usdgDelta)} USDG`}
+                {result.solo
+                  ? result.soloYou
+                    ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP + ${fmt(result.nvda, 4)} NVDA 🏆`
+                    : " · solo round (DRIP + NVDA went to one winner)"
+                  : ` · +${fmt(result.drip, 3)} DRIP · +${fmt(result.nvda, 4)} NVDA`}
+              </>
+            ) : (
+              "You had no stake on the winning tile."
+            )}
           </div>
           <button onClick={nextRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">Next round now</button>
           <div className="mt-1.5 text-center text-[11px] text-mute">Next round starts automatically…</div>
@@ -257,6 +276,13 @@ export default function MinePage() {
           </button>
         </div>
         <div className="mt-1 text-xs text-mute">In wallet: {fmt(claimed, 4)} DRIP · claiming taxes 10% to unclaimed holders</div>
+        <div className="mt-3 flex items-center justify-between border-t border-line/50 pt-3">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-mute">NVDA won</div>
+            <div className="mt-0.5 text-xl font-semibold text-white">{fmt(nvda, 4)}</div>
+          </div>
+          <span className="rounded-full border border-line bg-panel2 px-3 py-1 text-[11px] text-mute">4% of the cut · tokenized NVIDIA</span>
+        </div>
       </div>
 
       {/* Miners */}
@@ -317,14 +343,9 @@ function Drop({ big, gold }: { big?: boolean; gold?: boolean }) {
   );
 }
 
-// USDG glyph — a green dollar coin. Used for every USDG amount (deployed pool, tiles, stakes).
+// USDG glyph — the real Global Dollar mark (public/usdg.png). Used for every USDG amount.
 function Usdg({ big }: { big?: boolean }) {
-  const s = big ? 22 : 12;
-  return (
-    <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" fill="#34d399" />
-      <path d="M12 6.5v11M14.6 9.1c-.6-.6-1.6-1-2.6-1-1.5 0-2.7.8-2.7 2s1.2 1.7 2.7 2 2.7.8 2.7 2-1.2 2-2.7 2c-1.1 0-2.1-.4-2.7-1.1"
-        fill="none" stroke="#04160e" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
+  const s = big ? 22 : 13;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/usdg.png" alt="USDG" width={s} height={s} className="inline-block shrink-0 rounded-full" />;
 }
