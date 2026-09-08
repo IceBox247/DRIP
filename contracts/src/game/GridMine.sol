@@ -43,6 +43,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     uint16 public constant WINNERS_BPS = 1000; // 10% to this round's winners
     // motherlode gets the remainder (10%)
     uint16 public constant MOTHERLODE_ODDS = 625; // 1/625
+    uint16 public constant SOLO_ODDS = 2; // 1/2: 50% one winner takes the DRIP, 50% shared
 
     enum Status { Open, Closed, Settled }
 
@@ -52,11 +53,21 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         uint8 winningTile;
         bool motherlodeHit;
         bool rewardsProcessed;
+        bool soloMode; // true = one weighted winner takes all the round DRIP (incl. motherlode)
+        address soloWinner; // the picked winner when soloMode (0 = shared)
         uint256 totalIn; // gross USDG
         uint256 winnerStake; // USDG on the winning tile
-        uint256 winnerPotUsdg; // 90% of loser pot → winners (USDG)
+        uint256 winnerPotUsdg; // 90% of loser pot → winners (USDG), always pro-rata
         uint256 cutUsdg; // 10% of loser pot → swap to DRIP
         uint256 rewardDrip; // winner DRIP for the round (set at processRewards), held in RefiningVault
+    }
+
+    /// @dev Cumulative stake segments per tile, for weighted single-winner selection without a loop.
+    ///      Each deploy appends {user, cumEnd} where cumEnd is the tile's running total after it; a
+    ///      random ticket in [0, winnerStake) lands in exactly one segment (binary search).
+    struct Seg {
+        address user;
+        uint256 cumEnd;
     }
 
     IERC20 public immutable usdg;
@@ -74,6 +85,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     mapping(uint256 => Round) public rounds;
     mapping(uint256 => mapping(uint8 => uint256)) public tileTotal;
     mapping(uint256 => mapping(uint8 => mapping(address => uint256))) public stakeOf;
+    mapping(uint256 => mapping(uint8 => Seg[])) private _segs; // round => tile => cumulative segments
     mapping(uint256 => mapping(address => bool)) public usdgClaimed;
     mapping(uint256 => mapping(address => bool)) public dripClaimed;
 
@@ -132,6 +144,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         usdg.safeTransferFrom(msg.sender, address(this), amount);
         tileTotal[currentRound][tile] += amount;
         stakeOf[currentRound][tile][msg.sender] += amount;
+        _segs[currentRound][tile].push(Seg(msg.sender, tileTotal[currentRound][tile]));
         r.totalIn += amount;
         emit Deployed(currentRound, msg.sender, tile, amount);
     }
@@ -182,6 +195,12 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
             r.winnerPotUsdg = remainingLoser - cut;
             r.cutUsdg = cut;
             r.motherlodeHit = ((word >> 8) % MOTHERLODE_ODDS) == 0;
+            // 1-or-all: 50% one weighted winner takes the DRIP, 50% shared pro-rata (ORE mechanic).
+            if (((word >> 16) % SOLO_ODDS) == 0) {
+                r.soloMode = true;
+                uint256 ticket = (word >> 24) % winnerStake; // weighted by stake
+                r.soloWinner = _pickWinner(round, tile, ticket);
+            }
         }
 
         if (admin > 0) usdg.safeTransfer(marketing, admin);
@@ -256,7 +275,10 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         }
         if (r.rewardsProcessed && !dripClaimed[round][msg.sender]) {
             dripClaimed[round][msg.sender] = true;
-            uint256 dripOut = (r.rewardDrip * s) / winnerStake;
+            // USDG pot is always pro-rata; the DRIP reward is 1-or-all per ORE:
+            uint256 dripOut = r.soloMode
+                ? (msg.sender == r.soloWinner ? r.rewardDrip : 0) // one winner takes it all
+                : (r.rewardDrip * s) / winnerStake; // shared pro-rata
             if (dripOut > 0) refining.credit(msg.sender, dripOut); // accrues; claim charges refine tax
             emit HarvestedDrip(round, msg.sender, dripOut);
             did = true;
@@ -278,6 +300,20 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
 
     function getRound(uint256 round) external view returns (Round memory) {
         return rounds[round];
+    }
+
+    /// @dev Weighted winner for `ticket` in [0, tileTotal): first segment whose cumEnd > ticket.
+    ///      O(log n) reads — no unbounded loop over players.
+    function _pickWinner(uint256 round, uint8 tile, uint256 ticket) internal view returns (address) {
+        Seg[] storage segs = _segs[round][tile];
+        uint256 lo = 0;
+        uint256 hi = segs.length;
+        while (lo < hi) {
+            uint256 mid = (lo + hi) / 2;
+            if (segs[mid].cumEnd > ticket) hi = mid;
+            else lo = mid + 1;
+        }
+        return segs[lo].user;
     }
 
     function _openRound() internal {

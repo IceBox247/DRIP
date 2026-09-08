@@ -66,7 +66,7 @@ contract GameTest is Test {
         gridMine.deploy(10, 200 * U);
         vm.stopPrank();
 
-        rand.setWord(6407); // tile 7, no motherlode
+        rand.setWord(65557); // tile 7, no motherlode, SHARED (bit16 set → not solo)
         vm.warp(block.timestamp + 61);
         gridMine.closeRound(); // settles round 1
 
@@ -97,6 +97,53 @@ contract GameTest is Test {
         vm.prank(bob);
         gridMine.harvest(1);
         assertEq(refining.claimable(bob), 12275 * 1e14, "bob DRIP 1.2275");
+    }
+
+    function test_soloWinnerTakesAllDrip() public {
+        // Same deploys as the full round, but a SOLO word (bit16 clear) with ticket 0 → the first
+        // depositor on the winning tile (alice) takes ALL the round DRIP; bob gets none.
+        vm.startPrank(alice);
+        gridMine.deploy(7, 100 * U);
+        gridMine.deploy(3, 50 * U);
+        vm.stopPrank();
+        vm.startPrank(bob);
+        gridMine.deploy(7, 100 * U);
+        gridMine.deploy(10, 200 * U);
+        vm.stopPrank();
+
+        rand.setWord(1007); // tile 7, no motherlode, SOLO (bit16 clear), ticket 0 → alice
+        vm.warp(block.timestamp + 61);
+        gridMine.closeRound();
+        GridMine.Round memory r = gridMine.getRound(1);
+        assertTrue(r.soloMode, "solo mode");
+        assertEq(r.soloWinner, alice, "alice is the weighted solo winner (ticket 0)");
+
+        gridMine.processRewards(1, 0);
+        vm.prank(alice);
+        gridMine.harvest(1);
+        vm.prank(bob);
+        gridMine.harvest(1);
+
+        // DRIP: alice gets it all (2.455), bob gets none. USDG pot still shared (both staked 100).
+        assertEq(refining.claimable(alice), 2455 * 1e15, "alice takes all DRIP");
+        assertEq(refining.claimable(bob), 0, "bob gets no DRIP in solo mode");
+        assertEq(usdg.balanceOf(bob), (1000 - 300) * U + 210475 * U / 1000, "bob still gets USDG pot share");
+    }
+
+    function test_soloPlayerWinsPrincipalBack() public {
+        // Only alice plays and covers the winning tile → loser pot is 0 → no fee, no cut, no DRIP.
+        // She simply gets her USDG back. (Answers: "I'm the only one and I picked the winning block.")
+        vm.prank(alice);
+        gridMine.deploy(7, 100 * U);
+        rand.setWord(65557); // tile 7
+        vm.warp(block.timestamp + 61);
+        gridMine.closeRound();
+        gridMine.processRewards(1, 0);
+        vm.prank(alice);
+        gridMine.harvest(1);
+        assertEq(usdg.balanceOf(alice), 1000 * U, "alone + won: exact principal back, zero fees");
+        assertEq(refining.claimable(alice), 0, "no DRIP (nothing was bought)");
+        assertEq(usdg.balanceOf(marketing), 0, "no admin fee (no loser stake to take it from)");
     }
 
     function test_nothingIsMinted() public {

@@ -94,9 +94,10 @@
     "cutSplitWinnersBps": 1000,
     "cutSplitMotherlodeBps": 1000,
     "motherlodeOdds": 625,
+    "soloOdds": 2,
     "refineFeeBps": 1000,
     "randomness": "commit-reveal",
     "emissionsSource": "bought",
-    "$comment_fields": "dripTotalSupply = fixed DRIP supply (no mint; whole supply to the Pons launch which seeds DRIP/USDG liquidity). adminFeeBps 100 = 1% of gross deploys -> marketing/ops (taken from the loser stake). loserCutBps 1000 = 10% of the loser pot; that USDG BUYS DRIP, split by cutSplit* (of the bought DRIP): 70% burn / 10% stakers / 10% winners / 10% motherlode. Remaining 90% of the loser pot -> winners in USDG. refineFeeBps 1000 = 10% claim tax to unclaimed holders. motherlodeOdds 625 = 1/625. randomness: 'chainlink-vrf' if a coordinator exists (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'bought' = winner DRIP is bought from the pool, never minted."
+    "$comment_fields": "dripTotalSupply = fixed DRIP supply (no mint; whole supply to the Pons launch which seeds DRIP/USDG liquidity). adminFeeBps 100 = 1% of gross deploys -> marketing/ops (taken from the loser stake). loserCutBps 1000 = 10% of the loser pot; that USDG BUYS DRIP, split by cutSplit* (of the bought DRIP): 70% burn / 10% stakers / 10% winners / 10% motherlode. Remaining 90% of the loser pot -> winners in USDG. refineFeeBps 1000 = 10% claim tax to unclaimed holders. motherlodeOdds 625 = 1/625. soloOdds 2 = 1-or-all: 50% of rounds one weighted winner takes ALL the DRIP (incl. motherlode), 50% shared pro-rata; the USDG pot is always pro-rata. randomness: 'chainlink-vrf' if a coordinator exists (verify, DECISIONS #9) else 'commit-reveal'. emissionsSource 'bought' = winner DRIP is bought from the pool, never minted."
   }
 }

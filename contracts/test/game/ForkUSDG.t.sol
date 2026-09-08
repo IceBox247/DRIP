@@ -71,7 +71,7 @@ contract ForkUSDGTest is Test {
         gridMine.deploy(10, 200 * U);
         vm.stopPrank();
 
-        rand.setWord(6407);
+        rand.setWord(65557); // tile 7, shared (not solo)
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();
         gridMine.processRewards(1, 0);

@@ -26,10 +26,18 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
    pot**, split among the winning tile **pro-rata by stake**, paid in **USDG**.
 7. The 10% cut **buys DRIP** from the DRIP/USDG pool (Pons seeds it at launch), and the bought DRIP
    is split **70% burned / 10% stakers / 10% winners / 10% motherlode**.
-8. **Motherlode**: the 10% motherlode slice accrues in DRIP each round; a `1/625` hit adds the whole
-   jackpot to that round's winners.
-9. **Refining:** winners' DRIP accrues in `RefiningVault`; claiming costs 10% → to holders who
-   haven't claimed.
+8. **1-or-all (ORE):** 50% of rounds, one **weighted** winner (picked by a random ticket over the
+   winning tile's stake) takes **all** the round DRIP; the other 50% it's shared pro-rata. The USDG
+   pot is **always** pro-rata — only the DRIP reward is 1-or-all.
+9. **Motherlode**: the 10% motherlode slice accrues in DRIP each round; a `1/625` hit adds the whole
+   jackpot to that round's winners — and follows the same 1-or-all flip (solo round → the jackpot
+   goes to the one winner too).
+10. **Refining:** winners' DRIP accrues in `RefiningVault`; claiming costs 10% → to holders who
+    haven't claimed.
+
+**Edge case — a lone player who covers the winning tile:** the loser pot is 0, so there's **no admin
+fee, no cut, no DRIP bought** — they simply get their USDG back. You can't win from yourself. (A lone
+player only loses if the RNG lands on a tile they didn't cover.)
 
 Spreading across tiles = win often, small. Stacking one tile = rare, fat. Rounds stay ~1 minute —
 that cadence is the product.
