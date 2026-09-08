@@ -1,0 +1,54 @@
+{
+  "$comment": "Suggested default constants from SPEC.md §10. ALL values are tunable and MUST be reviewed before launch. Copy to constants.json (gitignored) and adjust per environment.",
+  "token": {
+    "totalSupply": null,
+    "$comment_totalSupply": "TBD — set in Phase 0 tokenomics finalize."
+  },
+  "fee": {
+    "totalBps": 400,
+    "launchpadBps": 100,
+    "autoBuyBps": 200,
+    "marketingBps": 100,
+    "$comment": "Basis points. 400 = 4%. Slices must sum to totalBps. Marketing slice may double as ops treasury — see DECISIONS.md #1."
+  },
+  "cycle": {
+    "durationSeconds": 3600,
+    "$comment": "1 hour default. Keeper triggers auto-buy + convert + split each cycle."
+  },
+  "reserve": {
+    "splitReserveBps": 5000,
+    "splitDistributeBps": 5000,
+    "drawHighBps": 200,
+    "drawMediumBps": 350,
+    "drawLowBps": 500,
+    "healthHighThresholdBps": 6000,
+    "healthLowThresholdBps": 2000,
+    "$comment": "Split 50/50. Drawdown thresholds are % of all-time peak reserve. High >60%, Low <20%."
+  },
+  "hashRate": {
+    "baseRate": 1,
+    "holdingExponent": 0.75,
+    "holdingMultiplier": 1,
+    "$comment": "hash_rate = baseRate + (dripHeld^holdingExponent)*holdingMultiplier + taskBoosts + referralBoosts. holdingExponent is the anti-whale dial."
+  },
+  "referral": {
+    "rateBps": 1000,
+    "levels": 1,
+    "overridesReferredEarnings": false,
+    "$comment": "10% override, single level. Override does NOT reduce the referred user's earnings."
+  },
+  "tasks": {
+    "boostAmount": null,
+    "boostDurationSeconds": null,
+    "$comment": "TASK_BOOST: +X hash for Y hours per task. Define per task type in Phase 2."
+  },
+  "claim": {
+    "cooldownSeconds": 0,
+    "$comment": "Default none; consider 3600 (1h) to reduce spam txns."
+  },
+  "chain": {
+    "mainnetChainId": 4663,
+    "testnetChainId": 46630,
+    "$comment": "Robinhood Chain. EVM, Arbitrum Orbit stack."
+  }
+}

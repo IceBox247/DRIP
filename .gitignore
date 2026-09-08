@@ -1,0 +1,39 @@
+# Resolved/private config (copy from config/constants.example.json)
+config/constants.json
+.env
+.env.*
+!.env.example
+
+# Secrets / keys — NEVER commit
+*.key
+*.pem
+keystore/
+secrets/
+
+# Solidity / Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+
+# Node / JS
+node_modules/
+dist/
+build/
+coverage/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Python (if backend uses it)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
