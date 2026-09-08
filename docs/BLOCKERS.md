@@ -48,6 +48,26 @@ textbook definition of an **investment contract** (securities exposure). Stock T
 
 ---
 
+## Dependency 3 — Launchpad fee access (confirm before Phase 1)
+
+The whole reward engine assumes the launchpad **delivers our share of the 4% fee** to us. We build
+no fee-collection mechanism of our own; if the fee never actually reaches a wallet we can spend
+from, there is nothing to convert into Stock Tokens.
+
+**Confirm with the launchpad:**
+
+- [ ] The launchpad routes our share of the trade fee to a wallet we control (**push**), or grants
+      us withdraw rights on its fee wallet (**pull**). (DECISIONS.md #5a)
+- [ ] Whether we receive the net 3% (launchpad keeps its 1%) or the gross 4%. (DECISIONS.md #5b)
+- [ ] The token the fee is paid in (DRIP? the pair's quote token? stablecoin?) — affects the swap
+      path to the Stock Token.
+- [ ] Delivery cadence / claim mechanics (continuous, or claimable in batches).
+- [ ] Test the full receive → distribute path on **testnet (46630)** with the real launchpad
+      integration (or a faithful mock) before Phase 3.
+
+**Status:** ⛔ Not confirmed. Less severe than #1/#2 (the user reports the launchpad does provide
+the fee), but it is a hard dependency for the fee engine and must be verified, not assumed.
+
 ## Gate policy
 
 Phase 3 (reward engine) code may be **written and tested on testnet** as scaffolding, but:

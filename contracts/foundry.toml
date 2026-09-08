@@ -7,8 +7,7 @@ script = "script"
 solc_version = "0.8.26"
 optimizer = true
 optimizer_runs = 200
-# Uniswap v4 hooks require via-ir in some configurations; enable when integrating v4-core.
-# via_ir = true
+# via_ir = true  # enable if a dependency needs it
 
 # Robinhood Chain RPCs — fill in real endpoints before use.
 [rpc_endpoints]

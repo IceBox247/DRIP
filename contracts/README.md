@@ -10,19 +10,24 @@ Solidity contracts for Drip, laid out as a [Foundry](https://book.getfoundry.sh/
 
 | File | Role | Phase | Spec |
 |---|---|---|---|
-| `src/DripToken.sol` | Fair-launch ERC-20. No team allocation. Fee is levied by the hook, **not** in `transfer()`. | 1 | §2.1, §6 |
-| `src/hooks/DripFeeHook.sol` | Uniswap v4 hook that takes the 4% on swaps and forwards to `FeeRouter`. | 1 | §2.1 |
-| `src/FeeRouter.sol` | Splits the 4% → 1% launchpad / 2% auto-buy buffer / 1% marketing-ops. | 1 | §2.1 |
+| `src/DripToken.sol` | Plain fair-launch ERC-20. **No fee logic.** May be launchpad-deployed. | 1 | §2.1, §6 |
+| `src/FeeDistributor.sol` | Splits the fee **received from the launchpad** → 2% auto-buy / 1% marketing (/ 1% launchpad). Optional on-chain; can be done in the keeper. | 1 | §2.1 |
 | `src/ReserveManager.sol` | 50/50 split of stock acquired each cycle; dynamic drawdown on low-volume cycles. | 3 | §3 |
 | `src/RewardVault.sol` | Holds Stock Tokens; publishes a per-cycle Merkle root; Merkle claims. | 3 | §2.4 |
 
 Interfaces live in `src/interfaces/`.
 
-## Why the fee is a hook, not `transfer()`
+## We do NOT collect the fee — there is no hook
 
-Tax-on-transfer logic inside `transfer()` breaks DEX routers (they revert on unexpected balance
-deltas). Robinhood Chain has Uniswap v4, so the clean approach is a **v4 hook** that charges the fee
-at swap time. `DripToken` itself stays a standard ERC-20.
+The **launchpad** collects the 4% on DRIP trades and delivers our share (see
+[`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)). So there is **no Uniswap v4 hook and no
+tax-on-transfer** in this repo — an earlier `DripFeeHook` was removed. `DripToken` is a plain
+ERC-20 (which the launchpad may even deploy for us). Our contracts start at the *distribution* of
+fee revenue we've already received. The split itself is **optional on-chain**: `FeeDistributor`
+gives a transparent, verifiable version, but the keeper can move the tokens directly instead.
+
+The launchpad-specific fee-receipt logic (push-read vs. pull-withdraw) lives in `keeper/`, not here,
+so these contracts stay launchpad-agnostic.
 
 ## Dependencies (not vendored)
 
@@ -31,7 +36,8 @@ Install with Foundry before implementing:
 ```bash
 forge install foundry-rs/forge-std
 forge install OpenZeppelin/openzeppelin-contracts
-forge install Uniswap/v4-core Uniswap/v4-periphery
+# No Uniswap v4 hook dependency — the launchpad collects the fee. A DEX router/quoter may still be
+# needed for the keeper's 2% -> Stock Token swap, wired from the keeper side.
 ```
 
 `lib/` and build artifacts are gitignored.

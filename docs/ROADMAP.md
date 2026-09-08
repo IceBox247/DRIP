@@ -14,12 +14,18 @@ Build order from SPEC §9. Each phase gates the next.
 
 ## Phase 1 — Contracts on testnet (46630)
 
-- [ ] `DripToken` (ERC-20, fair launch, no team allocation).
-- [ ] `DripFeeHook` (Uniswap v4 hook — 4% fee on swaps, **not** in `transfer()`).
-- [ ] `FeeRouter` (split 4% → 1% launchpad / 2% auto-buy / 1% marketing-ops).
-- [ ] Deploy + integration-test the fee path on testnet.
+> The launchpad collects the 4% fee — we do **not** build a fee hook or tax-on-transfer. Phase 1 is
+> about confirming how the launchpad delivers our share and distributing it.
 
-**Exit gate:** fee levied and routed correctly on testnet; router splits verified.
+- [ ] Confirm launchpad fee delivery: push vs. pull, and net 3% vs. gross 4% (DECISIONS.md #5).
+- [ ] Confirm who deploys DRIP — launchpad or us (DECISIONS.md #6). If us: `DripToken` (plain ERC-20,
+      fair launch, no team allocation).
+- [ ] `FeeDistributor` (split the fee we receive → 2% auto-buy / 1% marketing / 1% launchpad),
+      **or** decide to do the split off-chain in the keeper.
+- [ ] Fee-source adapter (push-read / pull-withdraw) isolated in `keeper/`.
+- [ ] Integration-test the fee-receipt → split path on testnet with a mocked fee source.
+
+**Exit gate:** launchpad delivery confirmed; our share is received and split correctly on testnet.
 
 ## Phase 2 — Backend + app
 

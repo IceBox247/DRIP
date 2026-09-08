@@ -26,13 +26,26 @@ The more DRIP you hold, the larger your share of the stock.
 
 | Slice | % | Destination |
 |---|---|---|
-| Launchpad | 1% | Launchpad wallet (fixed by launchpad) |
+| Launchpad | 1% | Launchpad wallet (retained by the launchpad) |
 | Auto-buy | 2% | Stock-buy buffer → converted to Stock Tokens hourly |
 | Marketing / Ops | 1% | Marketing treasury (**also funds servers/audit/legal — see §7**) |
 
-Implement the fee as a **Uniswap v4 hook**, NOT inside the token's `transfer()` function.
-Tax-on-transfer logic in `transfer()` breaks DEX routers; Robinhood Chain has Uniswap v4 hooks,
-which is the clean way.
+**The launchpad collects the fee — we do not.** The launchpad's trading venue already takes the 4%
+on every DRIP trade. Drip does **not** build any on-chain fee mechanism: no tax-on-transfer, and
+**no Uniswap v4 hook.** DRIP is a plain ERC-20 (which the launchpad may even deploy for us).
+
+What we build starts *after* the fee is collected. The launchpad makes our share available — either
+**pushed** to a wallet we control, or **pullable** from the launchpad's fee wallet — and our system
+distributes it:
+
+- **2%** → auto-buy buffer → keeper swaps it into Stock Token(s) hourly.
+- **1%** → marketing/ops treasury.
+- **1%** → the launchpad keeps (their cut).
+
+So the "fee engine" is a **treasury + keeper system operating on a wallet**, not a token that taxes
+its own trades. Two integration details to confirm with the launchpad (see [DECISIONS.md](./DECISIONS.md)
+#5): (a) push vs. pull delivery, and (b) whether we receive the net 3% (launchpad keeps its 1%
+first) or the gross 4% (we forward 1% back).
 
 ### 2.2 Hash rate formula `[DEFAULT]`
 
@@ -121,8 +134,9 @@ On low/zero-volume cycles (little or no new stock bought):
 | Layer | Component | Notes |
 |---|---|---|
 | Chain | Robinhood Chain | Mainnet chain ID **4663**, testnet **46630**. EVM, Arbitrum Orbit stack. |
-| Contract | `DripToken.sol` | ERC-20, fee logic via Uniswap v4 hook. |
-| Contract | `FeeRouter.sol` | Splits 4% → 1/2/1. |
+| Launchpad | Fee collection (external) | The launchpad's venue takes the 4% on trades and delivers our share. We do NOT build this. |
+| Contract | `DripToken.sol` | Plain ERC-20, no fee logic (may be launchpad-deployed). |
+| Contract | `FeeDistributor.sol` | Splits the fee **received from the launchpad** → 2% auto-buy / 1% marketing (/ 1% launchpad). Optional on-chain; can be done in the keeper. |
 | Contract | `RewardVault.sol` | Holds Stock Tokens, Merkle-claim payouts. |
 | Contract | `ReserveManager.sol` | 50/50 split + dynamic drawdown logic (§3). |
 | Automation | Keeper (Gelato or Chainlink Automation) | **Contracts can't self-trigger.** External keeper calls the hourly auto-buy + convert + split. |
@@ -130,9 +144,10 @@ On low/zero-volume cycles (little or no new stock bought):
 | Backend | Auth | Wallet connect + X OAuth. |
 | Frontend | Web + mobile | Node dashboard, hash rate, claimable stock, referral link, task list. |
 
-**Data flow:** trade → 4% fee → FeeRouter → 2% buffer → keeper (hourly) swaps to Stock Token →
-ReserveManager splits 50/50 → backend computes per-user allocations from points → publishes Merkle
-root → users claim from RewardVault.
+**Data flow:** trade → **launchpad collects 4% fee** → our share lands in the fee wallet →
+`FeeDistributor`/keeper splits (2% auto-buy / 1% marketing / 1% launchpad) → keeper (hourly) swaps
+the 2% buffer to Stock Token → ReserveManager splits 50/50 → backend computes per-user allocations
+from points → publishes Merkle root → users claim from RewardVault.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository mapping.
 
@@ -148,6 +163,11 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the expanded diagram and repository
 3. **Which Stock Token(s)** does the 2% buy? One (e.g. a broad ETF token) or a basket?
    `[DEFAULT: single liquid ETF-style token for simplicity]`
 4. **Referral depth** (§4).
+5. **Launchpad fee delivery.** (a) Push (launchpad sends our share to a wallet we designate) vs.
+   pull (we have withdraw rights on the launchpad fee wallet)? (b) Do we receive the net 3%
+   (launchpad keeps its 1% first) or the gross 4% (we forward 1% back)? See §2.1.
+6. **Who deploys DRIP?** The launchpad may deploy the token as part of the fair launch, or we deploy
+   a plain ERC-20 and list it. Confirm which — it changes what we build in Phase 1.
 
 Tracked in [DECISIONS.md](./DECISIONS.md).
 
@@ -172,7 +192,9 @@ Tracked in [BLOCKERS.md](./BLOCKERS.md).
 ## 9. Build order
 
 - **Phase 0 — Legal + tokenomics finalize + ops funding.** (Do first.)
-- **Phase 1 — Contracts on testnet (46630):** DripToken + FeeRouter + fee hook.
+- **Phase 1 — Contracts on testnet (46630):** confirm the launchpad fee delivery + DRIP token
+  (may be launchpad-deployed); build `FeeDistributor` to split the fee we receive. **No fee hook —
+  the launchpad collects the fee.**
 - **Phase 2 — Backend + app:** accounts, node timer, hash rate, points, X auth, tasks, referral graph.
 - **Phase 3 — Reward engine:** keeper auto-buy + ReserveManager (50/50 + dynamic draw) + RewardVault + Merkle claim.
 - **Phase 4 — Audit → mainnet → launchpad listing → seed liquidity → marketing.**

@@ -6,6 +6,11 @@ timer — **not** real mining) and earn *hash rate* from their DRIP holdings plu
 boosts; hash rate accrues points, and points entitle users to claim real Stock Tokens bought by the
 fee engine.
 
+**The launchpad collects the 4% fee — we don't.** DRIP is a plain ERC-20 with no fee logic; there is
+no Uniswap hook and no tax-on-transfer on our side. The launchpad's trading venue takes the fee and
+delivers our share to a wallet, and our system distributes it (2% → Stock Tokens, 1% → marketing,
+1% → launchpad) and runs the reward engine. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
 > **The full specification is the source of truth:** [`docs/SPEC.md`](./docs/SPEC.md).
 
 ---
@@ -35,9 +40,9 @@ docs/          Canonical spec and planning docs (start here)
   DECISIONS.md     Open decisions to resolve before Phase 1 (§7)
   BLOCKERS.md      Hard gates that can invalidate the design (§8)
 config/        Tunable constants (constants.example.json — §10)
-contracts/     Solidity (Foundry) — DripToken, FeeRouter, hook, ReserveManager, RewardVault
+contracts/     Solidity (Foundry) — DripToken, FeeDistributor, ReserveManager, RewardVault
 backend/       Off-chain points engine + auth (Phase 2)
-keeper/        Automation that triggers the hourly reward cycle (Phase 3)
+keeper/        Automation: launchpad fee receipt + hourly reward cycle (Phase 3)
 frontend/      Web + mobile app (Phase 2)
 ```
 
