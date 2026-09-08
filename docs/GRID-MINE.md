@@ -36,6 +36,10 @@ protocol cut buys back + burns the token. This doc maps that to an EVM/Robinhood
 10. **Refining:** winners' DRIP accrues in `RefiningVault`; claiming costs 10% → to holders who
     haven't claimed.
 
+**No-winner rounds (RNG lands on a tile nobody staked):** the entire net pool buys DRIP and **100%
+is burned** — no funds are stranded and none go to the team; it's pure deflation that benefits every
+DRIP holder. (Chosen over routing to the motherlode / next round.)
+
 **Edge case — a lone player who covers the winning tile:** the loser pot is 0, so there's **no cut
 and no DRIP bought** — they get their **net stake back** (the only cost is the flat 1% entry fee paid
 at deploy). You can't win from yourself. (A lone player only loses their stake if the RNG lands on a
