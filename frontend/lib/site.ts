@@ -22,11 +22,26 @@ export const site = {
   links: {
     // TODO: replace with real URLs before launch.
     app: "/app",
+    game: "/game",
     x: "https://x.com",
     github: "https://github.com/IceBox247/DRIP",
     spec: "https://github.com/IceBox247/DRIP/blob/main/docs/SPEC.md",
     docs: "https://github.com/IceBox247/DRIP/tree/main/docs",
   },
+} as const;
+
+// Grid Mine params — MUST mirror the contracts (contracts/src/game/) and config gridMine.
+export const gridMine = {
+  tiles: 25, // 5×5
+  roundSeconds: 60,
+  deployAsset: "USDG",
+  adminFeeBps: 100, // 1% of gross
+  loserCutBps: 1000, // 10% of loser pot → buyback
+  emissionPerRound: 1, // DRIP to winners
+  motherlodePerRound: 0.2, // DRIP added each round
+  motherlodeOdds: 625, // 1 / 625
+  refineFeeBps: 1000, // 10% claim tax → unclaimed
+  burnBps: 9000, // 90% of buyback burned
 } as const;
 
 export const stats = [

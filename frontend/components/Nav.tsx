@@ -5,7 +5,7 @@ import { site } from "@/lib/site";
 const navLinks = [
   { href: "/#how", label: "How it works" },
   { href: "/#rewards", label: "Rewards" },
-  { href: "/#referrals", label: "Referrals" },
+  { href: "/game", label: "Grid Mine" },
   { href: "/#faq", label: "FAQ" },
 ];
 
