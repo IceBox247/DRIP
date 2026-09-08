@@ -316,7 +316,7 @@ function Stat({ label, value, accent, gold, danger, border }: { label: string; v
     <div className={border ? "border-x border-line/60" : ""}>
       <div className={`flex items-center justify-center gap-1.5 text-2xl font-semibold ${danger ? "text-red-400" : gold ? "text-yellow-500" : "text-white"}`}>
         {accent && <Usdg />}
-        {gold && <Drop gold />}
+        {gold && <Drip />}
         {value}
       </div>
       <div className="mt-1 text-[11px] uppercase tracking-wide text-mute">{label}</div>
@@ -333,14 +333,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-// DRIP glyph — a lime droplet (the Drip mark). Used only for DRIP amounts (e.g. the motherlode).
-function Drop({ big, gold }: { big?: boolean; gold?: boolean }) {
-  const s = big ? 22 : 12;
-  return (
-    <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block" aria-hidden="true">
-      <path d="M12 2.5c4 5 6.6 8.3 6.6 11.6a6.6 6.6 0 1 1-13.2 0C5.4 10.8 8 7.5 12 2.5z" fill={gold ? "#eab308" : "#c6f24e"} />
-    </svg>
-  );
+// DRIP glyph — the official Drip mark (public/logo.png). Used for DRIP amounts (e.g. the motherlode).
+function Drip({ big }: { big?: boolean }) {
+  const s = big ? 24 : 18;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/logo.png" alt="DRIP" width={s} height={s} className="inline-block shrink-0 rounded-full" />;
 }
 
 // USDG glyph — the real Global Dollar mark (public/usdg.png). Used for every USDG amount.
