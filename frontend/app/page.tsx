@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { ContractStrip } from "@/components/ContractStrip";
+import { GridHero } from "@/components/GridHero";
 import { site, stats, steps, faqs } from "@/lib/site";
 
 export default function Home() {
@@ -14,48 +15,54 @@ export default function Home() {
         {/* Hero */}
         <section className="relative overflow-hidden hero-glow">
           <div className="pointer-events-none absolute inset-0 grid-bg" aria-hidden="true" />
-          <div className="relative mx-auto max-w-content px-5 pb-16 pt-20 sm:pt-28">
-            <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3 py-1 text-xs text-mute">
-              <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" />
-              {live
-                ? `Live on ${site.chain} · via ${site.launchpad}`
-                : `Pre-launch · fair launch on ${site.chain} · via ${site.launchpad}`}
+          <div className="relative mx-auto max-w-content px-5 pb-16 pt-16 sm:pt-24">
+            <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3 py-1 text-xs text-mute">
+                  <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" />
+                  {live
+                    ? `Live on ${site.chain} · via ${site.launchpad}`
+                    : `Pre-launch · fair launch on ${site.chain} · via ${site.launchpad}`}
+                </div>
+
+                <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
+                  Mine the grid.
+                  <br />
+                  Win <span className="text-lime">tokenized stock.</span>
+                </h1>
+
+                <p className="mt-6 max-w-xl text-lg leading-relaxed text-mute">
+                  Every 60 seconds, deploy {site.launchpad === "Pons" ? "USDG" : "funds"} onto a 5×5
+                  mine. One tile wins — winners split the pot and mine fresh DRIP; the protocol buys
+                  back and burns. The team holds zero tokens.
+                </p>
+
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={site.links.game}
+                    className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
+                  >
+                    Play Grid Mine
+                  </Link>
+                  <a
+                    href={site.links.spec}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-line bg-panel/60 px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-mute/50"
+                  >
+                    Read the spec
+                  </a>
+                </div>
+
+                <p className="mt-4 text-xs text-mute/70">
+                  A game of chance, played on-chain. Demo is simulated with fake funds — not launched,
+                  not available where prohibited.
+                </p>
+              </div>
+
+              {/* Live-looking mine */}
+              <GridHero />
             </div>
-
-            <h1 className="mt-6 max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-7xl">
-              Hold DRIP.
-              <br />
-              Mine <span className="text-lime">tokenized stock.</span>
-            </h1>
-
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-mute">
-              Drip turns trading fees into a real reward pool. Run a node, earn hash rate from your
-              holdings, tasks and referrals, and claim your share of tokenized stock each cycle. The
-              team holds zero tokens.
-            </p>
-
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href={site.links.app}
-                className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
-              >
-                {live ? "Start mining" : "Preview the app"}
-              </Link>
-              <a
-                href={site.links.spec}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg border border-line bg-panel/60 px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-mute/50"
-              >
-                Read the spec
-              </a>
-            </div>
-
-            <p className="mt-4 text-xs text-mute/70">
-              {live
-                ? "“Mining” is a server-side accrual timer — not real mining. Nothing runs on your device."
-                : "Not launched yet — this is a preview of how Drip will work. “Mining” is a server-side accrual timer, not real mining."}
-            </p>
 
             {/* Stat row */}
             <div className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-3">
@@ -70,8 +77,34 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How it works */}
-        <Section id="how" eyebrow="How it works" title="From holding to claiming, in four steps">
+        {/* Grid Mine — the main tech */}
+        <Section id="grid" eyebrow="Grid Mine · the core game" title="A round every minute">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[
+              { n: "01", title: "Deploy", body: "Stake USDG onto any of the 25 tiles before the 60-second round closes. Spread wide or stack one." },
+              { n: "02", title: "One tile wins", body: "A secure on-chain RNG picks the winning tile — 1-in-25. Nobody, not even the team, can pick it." },
+              { n: "03", title: "Winners split + mine", body: "Losers' USDG is redistributed to the winning tile (pro-rata), and the round mints fresh DRIP to winners." },
+              { n: "04", title: "Buyback + refine", body: "The protocol cut buys DRIP and burns 90%. Claim your DRIP anytime — waiting earns you others' 10% refine tax." },
+            ].map((s) => (
+              <div key={s.n} className="rounded-2xl border border-line bg-panel p-6 transition-colors hover:border-mute/40">
+                <div className="text-sm font-semibold text-lime">{s.n}</div>
+                <h3 className="mt-3 text-lg font-semibold text-white">{s.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-mute">{s.body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link href={site.links.game} className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02]">
+              Play Grid Mine
+            </Link>
+            <span className="text-xs text-mute">
+              +0.2 DRIP jackpot builds every round · 1-in-625 chance it dumps on the winning tile 🎰
+            </span>
+          </div>
+        </Section>
+
+        {/* Passive engine — the complement */}
+        <Section id="how" eyebrow="The other engine · passive" title="Or just hold, and earn stock">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {steps.map((s) => (
               <div
