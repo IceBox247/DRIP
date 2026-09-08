@@ -42,7 +42,7 @@ export function Nav() {
             href={site.links.app}
             className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
           >
-            Launch app
+            {site.launched ? "Launch app" : "Preview"}
           </Link>
         </div>
       </div>

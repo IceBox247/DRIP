@@ -9,6 +9,15 @@ export const site = {
   chain: "Robinhood Chain",
   launchpad: "Pons",
   tagline: "Hold DRIP. Mine tokenized stock.",
+
+  // ── Launch state ────────────────────────────────────────────────────────────
+  // DRIP is NOT deployed yet. Keep `launched` false until the token is live on Pons,
+  // then set `contractAddress` to the REAL deployed address and flip `launched` to true.
+  // Never put a placeholder address here that looks real — pre-launch we show a
+  // "no CA exists yet, anything claiming one is a scam" notice instead.
+  launched: false,
+  contractAddress: null as string | null,
+
   // Do NOT paste real financial figures here unless verified. Use descriptors, not fake stats.
   links: {
     // TODO: replace with real URLs before launch.

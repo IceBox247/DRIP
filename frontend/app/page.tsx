@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { ContractStrip } from "@/components/ContractStrip";
 import { site, stats, steps, faqs } from "@/lib/site";
 
 export default function Home() {
+  const live = site.launched;
   return (
     <>
       <Nav />
+      <ContractStrip />
       <main>
         {/* Hero */}
         <section className="relative overflow-hidden hero-glow">
@@ -14,7 +17,9 @@ export default function Home() {
           <div className="relative mx-auto max-w-content px-5 pb-16 pt-20 sm:pt-28">
             <div className="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3 py-1 text-xs text-mute">
               <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" />
-              Fair launch on {site.chain} · via {site.launchpad}
+              {live
+                ? `Live on ${site.chain} · via ${site.launchpad}`
+                : `Pre-launch · fair launch on ${site.chain} · via ${site.launchpad}`}
             </div>
 
             <h1 className="mt-6 max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-7xl">
@@ -34,7 +39,7 @@ export default function Home() {
                 href={site.links.app}
                 className="rounded-lg bg-lime px-5 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
               >
-                Start mining
+                {live ? "Start mining" : "Preview the app"}
               </Link>
               <a
                 href={site.links.spec}
@@ -47,8 +52,9 @@ export default function Home() {
             </div>
 
             <p className="mt-4 text-xs text-mute/70">
-              &ldquo;Mining&rdquo; is a server-side accrual timer — not real mining. Nothing runs on
-              your device.
+              {live
+                ? "“Mining” is a server-side accrual timer — not real mining. Nothing runs on your device."
+                : "Not launched yet — this is a preview of how Drip will work. “Mining” is a server-side accrual timer, not real mining."}
             </p>
 
             {/* Stat row */}
@@ -231,19 +237,30 @@ export default function Home() {
         <section className="mx-auto max-w-content px-5 py-16">
           <div className="hero-glow relative overflow-hidden rounded-3xl border border-line bg-panel p-10 text-center sm:p-16">
             <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-              Turn on your node.
+              {live ? "Turn on your node." : "Be ready at launch."}
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-mute">
-              Connect a wallet and your X account to start earning hash rate toward tokenized-stock
-              rewards.
+              {live
+                ? "Connect a wallet and your X account to start earning hash rate toward tokenized-stock rewards."
+                : "Drip isn’t live yet. Explore the preview and read the spec so you understand exactly how it works before launch."}
             </p>
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex justify-center gap-3">
               <Link
                 href={site.links.app}
                 className="rounded-lg bg-lime px-6 py-3 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
               >
-                Launch app
+                {live ? "Launch app" : "Preview the app"}
               </Link>
+              {!live && (
+                <a
+                  href={site.links.x}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-line bg-ink px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-mute/50"
+                >
+                  Follow for launch
+                </a>
+              )}
             </div>
           </div>
         </section>
