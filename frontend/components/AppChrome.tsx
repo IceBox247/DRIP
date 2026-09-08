@@ -23,9 +23,6 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex items-center justify-between border-b border-line/60 bg-ink/85 px-4 py-3 backdrop-blur">
         <Link href="/" className="flex items-center gap-2">
           <Logo className="text-white" />
-          <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] font-medium text-mute">
-            pre-launch
-          </span>
         </Link>
         <div className="flex items-center gap-3">
           <a href={site.links.github} target="_blank" rel="noreferrer" className="text-mute hover:text-white" aria-label="GitHub">
