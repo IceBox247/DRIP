@@ -35,13 +35,15 @@ export const gridMine = {
   tiles: 25, // 5×5
   roundSeconds: 60,
   deployAsset: "USDG",
-  adminFeeBps: 100, // 1% of gross
-  loserCutBps: 1000, // 10% of loser pot → buyback
-  emissionPerRound: 1, // DRIP to winners
-  motherlodePerRound: 0.2, // DRIP added each round
+  adminFeeBps: 100, // 1% of gross → marketing/ops
+  loserCutBps: 1000, // 10% of loser pot → buys DRIP
+  cutSplitBurnBps: 7000, // of the bought DRIP: 70% burned
+  cutSplitStakersBps: 1000, // 10% to stakers
+  cutSplitWinnersBps: 1000, // 10% to this round's winners
+  cutSplitMotherlodeBps: 1000, // 10% to the motherlode
   motherlodeOdds: 625, // 1 / 625
-  refineFeeBps: 1000, // 10% claim tax → unclaimed
-  burnBps: 9000, // 90% of buyback burned
+  soloOdds: 2, // 1-or-all: 50% one winner takes the DRIP, 50% shared
+  refineFeeBps: 1000, // 10% claim tax → unclaimed holders
 } as const;
 
 export const stats = [
