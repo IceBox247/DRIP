@@ -11,8 +11,11 @@ import { gridMine } from "@/lib/site";
 type Tile = { mine: number; others: number };
 const N = gridMine.tiles;
 const START_USDG = 1000;
-const seed = () =>
-  Array.from({ length: N }, () => ({ mine: 0, others: Math.random() < 0.7 ? Math.round((8 + Math.random() * 60) * 100) / 100 : 0 }));
+// A round starts EMPTY and idle — no stake, timer paused — until the first miner deploys. When you
+// enter, other miners "join" (seeded here) and the countdown begins.
+const empty = (): Tile[] => Array.from({ length: N }, () => ({ mine: 0, others: 0 }));
+const seedOthers = (): number[] =>
+  Array.from({ length: N }, () => (Math.random() < 0.7 ? Math.round((8 + Math.random() * 60) * 100) / 100 : 0));
 const fmt = (n: number, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 const MINERS = [
@@ -23,7 +26,8 @@ const MINERS = [
 
 export default function MinePage() {
   const [mode, setMode] = useState<"lite" | "pro">("pro");
-  const [tiles, setTiles] = useState<Tile[]>(seed);
+  const [tiles, setTiles] = useState<Tile[]>(empty);
+  const [started, setStarted] = useState(false); // timer runs only after the first miner enters
   const [selected, setSelected] = useState<number[]>([]);
   const [amount, setAmount] = useState(10);
   const [usdg, setUsdg] = useState(START_USDG);
@@ -52,9 +56,16 @@ export default function MinePage() {
     const per = Math.round(((amount - admin) / targets.length) * 1e4) / 1e4;
     setUsdg((u) => Math.round((u - amount) * 100) / 100);
     setAdminFees((a) => Math.round((a + admin) * 100) / 100);
-    setTiles((ts) => ts.map((t, j) => (targets.includes(j) ? { ...t, mine: t.mine + per } : t)));
+    // First deploy of the round: other miners join and the timer starts.
+    const others = started ? null : seedOthers();
+    setTiles((ts) => ts.map((t, j) => ({
+      ...t,
+      others: others ? t.others + others[j] : t.others,
+      mine: targets.includes(j) ? t.mine + per : t.mine,
+    })));
+    if (!started) setStarted(true);
     setSelected([]);
-  }, [amount, targets, canDeploy]);
+  }, [amount, targets, canDeploy, started]);
 
   const settle = useCallback(() => {
     const gross = tiles.reduce((s, t) => s + t.mine + t.others, 0);
@@ -87,9 +98,10 @@ export default function MinePage() {
 
   const nextRound = useCallback(() => {
     setRound((r) => r + 1);
-    setTiles(seed());
+    setTiles(empty());
     setResult(null);
     setSelected([]);
+    setStarted(false);
     setTimeLeft(gridMine.roundSeconds);
   }, []);
 
@@ -99,12 +111,20 @@ export default function MinePage() {
     setUnrefined(0);
   };
 
+  // Countdown — only runs once a miner has entered (started). No entries = timer stays paused.
   useEffect(() => {
-    if (result) return;
+    if (result || !started) return;
     if (timeLeft <= 0) { settle(); return; }
     const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(id);
-  }, [timeLeft, result, settle]);
+  }, [timeLeft, result, started, settle]);
+
+  // Auto-advance to the next round a few seconds after settlement.
+  useEffect(() => {
+    if (!result) return;
+    const id = setTimeout(nextRound, 4500);
+    return () => clearTimeout(id);
+  }, [result, nextRound]);
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
@@ -115,8 +135,16 @@ export default function MinePage() {
       <div className="grid grid-cols-3 px-4 py-6 text-center">
         <Stat label="DEPLOYED" value={fmt(pool)} accent />
         <Stat label="MOTHERLODE" value={fmt(motherlode, 0)} gold border />
-        <Stat label="TIME" value={result ? "00:00" : `${mm}:${ss}`} danger={!result && timeLeft <= 10} />
+        <Stat label="TIME" value={result ? "00:00" : !started ? "--:--" : `${mm}:${ss}`} danger={started && !result && timeLeft <= 10} />
       </div>
+
+      {/* Waiting state — the round is idle until the first miner deploys. */}
+      {!started && !result && (
+        <div className="mx-4 mb-1 flex items-center justify-center gap-2 rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs text-mute">
+          <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulseDot" />
+          Waiting for the first miner — the timer starts when someone deploys.
+        </div>
+      )}
 
       {/* Lite / Pro toggle */}
       <div className="flex items-center justify-center gap-1 rounded-full">
@@ -138,7 +166,8 @@ export default function MinePage() {
               ? `+${fmt(result.usdgDelta)} USDG` + (result.solo ? (result.soloYou ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP 🏆` : " · solo round (DRIP went to one winner)") : ` · +${fmt(result.drip, 3)} DRIP`)
               : "You had no stake on the winning tile."}
           </div>
-          <button onClick={nextRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">Next round</button>
+          <button onClick={nextRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">Next round now</button>
+          <div className="mt-1.5 text-center text-[11px] text-mute">Next round starts automatically…</div>
         </div>
       )}
 
@@ -161,7 +190,7 @@ export default function MinePage() {
                   className={`relative aspect-square rounded-xl border transition-all ${sel ? "border-white ring-1 ring-white/60" : "border-line bg-panel/40 hover:border-mute/50"} ${t.mine > 0 ? "bg-lime/5" : ""}`}>
                   {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
                   <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[10px] font-medium text-mute">
-                    <Drop /> {fmt(total, total >= 1 ? 1 : 3)}
+                    <Usdg /> {fmt(total, total >= 1 ? 1 : 3)}
                   </div>
                 </button>
               );
@@ -175,7 +204,7 @@ export default function MinePage() {
         <div className="px-4 pt-6">
           <div className="text-center">
             <div className="text-5xl font-semibold tracking-tight text-white">{fmt(amount, 0)}</div>
-            <div className="mt-1 flex justify-center"><Drop big /></div>
+            <div className="mt-1 flex justify-center"><Usdg big /></div>
           </div>
           <div className="mt-5 grid grid-cols-4 gap-2">
             {[
@@ -200,7 +229,7 @@ export default function MinePage() {
             )}
             <Row label="ROUNDS"><span className="font-semibold text-mute">1</span></Row>
             <Row label="PER ROUND">
-              <span className="flex items-center gap-1 font-semibold text-white"><Drop /> {fmt(amount, 0)}</span>
+              <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, 0)}</span>
             </Row>
           </div>
 
@@ -242,7 +271,7 @@ export default function MinePage() {
               </span>
               <span className="flex items-center gap-3 text-mute">
                 <span className="text-xs">▦ {m.t}</span>
-                <span className="flex items-center gap-1 font-semibold text-white"><Drop /> {fmt(m.v, 2)}</span>
+                <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(m.v, 2)}</span>
               </span>
             </div>
           ))}
@@ -260,8 +289,8 @@ function Stat({ label, value, accent, gold, danger, border }: { label: string; v
   return (
     <div className={border ? "border-x border-line/60" : ""}>
       <div className={`flex items-center justify-center gap-1.5 text-2xl font-semibold ${danger ? "text-red-400" : gold ? "text-yellow-500" : "text-white"}`}>
-        {accent && <Drop />}
-        {gold && <span className="text-yellow-500">◎</span>}
+        {accent && <Usdg />}
+        {gold && <Drop gold />}
         {value}
       </div>
       <div className="mt-1 text-[11px] uppercase tracking-wide text-mute">{label}</div>
@@ -278,12 +307,24 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-// Small DRIP/USDG glyph — a lime droplet (the Drip mark), not the old tri-bar icon.
-function Drop({ big }: { big?: boolean }) {
+// DRIP glyph — a lime droplet (the Drip mark). Used only for DRIP amounts (e.g. the motherlode).
+function Drop({ big, gold }: { big?: boolean; gold?: boolean }) {
   const s = big ? 22 : 12;
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block" aria-hidden="true">
-      <path d="M12 2.5c4 5 6.6 8.3 6.6 11.6a6.6 6.6 0 1 1-13.2 0C5.4 10.8 8 7.5 12 2.5z" fill="#c6f24e" />
+      <path d="M12 2.5c4 5 6.6 8.3 6.6 11.6a6.6 6.6 0 1 1-13.2 0C5.4 10.8 8 7.5 12 2.5z" fill={gold ? "#eab308" : "#c6f24e"} />
+    </svg>
+  );
+}
+
+// USDG glyph — a green dollar coin. Used for every USDG amount (deployed pool, tiles, stakes).
+function Usdg({ big }: { big?: boolean }) {
+  const s = big ? 22 : 12;
+  return (
+    <svg width={s} height={s} viewBox="0 0 24 24" className="inline-block" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="#34d399" />
+      <path d="M12 6.5v11M14.6 9.1c-.6-.6-1.6-1-2.6-1-1.5 0-2.7.8-2.7 2s1.2 1.7 2.7 2 2.7.8 2.7 2-1.2 2-2.7 2c-1.1 0-2.1-.4-2.7-1.1"
+        fill="none" stroke="#04160e" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
