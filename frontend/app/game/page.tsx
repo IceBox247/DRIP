@@ -38,7 +38,7 @@ export default function MinePage() {
   const [adminFees, setAdminFees] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [round, setRound] = useState(397203);
-  const [last, setLast] = useState<{ tile: number; solo: boolean } | null>({ tile: 13, solo: false });
+  const [last, setLast] = useState<{ tile: number; solo: boolean; winner: string } | null>({ tile: 13, solo: false, winner: "KingAmadán" });
   const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; nvda: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
   const [sparkles] = useState<boolean[]>(() => Array.from({ length: N }, () => Math.random() < 0.4));
 
@@ -103,7 +103,7 @@ export default function MinePage() {
     if (drip > 0) setUnrefined((d) => Math.round((d + drip) * 1e6) / 1e6);
     if (nvda > 0) setNvda((n) => Math.round((n + nvda) * 1e6) / 1e6);
     setResult({ tile, won: usdgDelta > 0, usdgDelta, drip, nvda, solo, soloYou, motherlodeHit });
-    setLast({ tile, solo });
+    setLast({ tile, solo, winner: soloYou ? "You" : MINERS[Math.floor(Math.random() * MINERS.length)].a });
   }, [tiles, motherlode]);
 
   const nextRound = useCallback(() => {
@@ -156,18 +156,6 @@ export default function MinePage() {
         </div>
       )}
 
-      {/* Lite / Pro toggle */}
-      <div className="flex items-center justify-center gap-1 rounded-full">
-        <div className="inline-flex rounded-full border border-line bg-panel p-1">
-          {(["lite", "pro"] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)}
-              className={`rounded-full px-5 py-1.5 text-sm font-semibold capitalize ${mode === m ? "bg-white text-ink" : "text-mute"}`}>
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {result && (
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
           <div className="font-semibold text-white">Round #{round} — tile {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
@@ -190,30 +178,53 @@ export default function MinePage() {
         </div>
       )}
 
-      {/* Pro grid */}
-      {mode === "pro" && !result && (
+      {/* Last round + grid + Lite/Pro toggle (below the grid, ORE-style) */}
+      {!result && (
         <>
           <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs">
             <span className="uppercase tracking-wide text-mute">Last round</span>
             <span className="flex items-center gap-2 text-mute">
-              tile #{last?.tile}
+              <span className="flex items-center gap-1"><Grid4 /> {last?.tile}</span>
+              <span className="font-medium text-white/90">{last?.winner}</span>
               <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">{last?.solo ? "Solo" : "Split"}</span>
+              <span className="text-mute/70">›</span>
             </span>
           </div>
-          <div className="grid grid-cols-5 gap-1.5 px-4 pt-3">
-            {tiles.map((t, i) => {
-              const sel = selected.includes(i);
-              const total = t.mine + t.others;
-              return (
-                <button key={i} onClick={() => toggle(i)}
-                  className={`relative aspect-square rounded-xl border transition-all ${sel ? "border-white ring-1 ring-white/60" : "border-line bg-panel/40 hover:border-mute/50"} ${t.mine > 0 ? "bg-lime/5" : ""}`}>
-                  {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
-                  <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[10px] font-medium text-mute">
-                    <Usdg /> {fmt(total, total >= 1 ? 1 : 3)}
-                  </div>
+
+          {mode === "pro" && (
+            <div className="grid grid-cols-5 gap-1.5 px-4 pt-3">
+              {tiles.map((t, i) => {
+                const sel = selected.includes(i);
+                const total = t.mine + t.others;
+                return (
+                  <button key={i} onClick={() => toggle(i)}
+                    className={`relative aspect-square rounded-xl border transition-all ${sel ? "border-white ring-1 ring-white/60" : "border-line bg-panel/40 hover:border-mute/50"} ${t.mine > 0 ? "bg-lime/5" : ""}`}>
+                    {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
+                    <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[10px] font-medium text-mute">
+                      <Usdg /> {fmt(total, total >= 1 ? 1 : 3)}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Lite / Pro toggle + settings — sits below the grid, like ORE */}
+          <div className="relative mt-5 flex items-center justify-center px-4">
+            <div className="inline-flex rounded-full border border-line bg-panel p-1">
+              {(["lite", "pro"] as const).map((m) => (
+                <button key={m} onClick={() => setMode(m)}
+                  className={`rounded-full px-6 py-1.5 text-sm font-semibold capitalize ${mode === m ? "bg-white text-ink" : "text-mute"}`}>
+                  {m}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+            <button aria-label="Settings" className="absolute right-4 text-mute transition-colors hover:text-white">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
           </div>
         </>
       )}
@@ -296,7 +307,7 @@ export default function MinePage() {
                 <span className="text-white">{m.a}</span>
               </span>
               <span className="flex items-center gap-3 text-mute">
-                <span className="text-xs">▦ {m.t}</span>
+                <span className="flex items-center gap-1 text-xs"><Grid4 /> {m.t}</span>
                 <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(m.v, 2)}</span>
               </span>
             </div>
@@ -338,6 +349,16 @@ function Drip({ big }: { big?: boolean }) {
   const s = big ? 24 : 18;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/logo.png" alt="DRIP" width={s} height={s} className="inline-block shrink-0 rounded-full" />;
+}
+
+// Small 2×2 grid glyph — the tile-count marker (ORE-style) in the Last round / Miners rows.
+function Grid4() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" className="inline-block" aria-hidden="true">
+      <rect x="0" y="0" width="5" height="5" rx="1" /><rect x="7" y="0" width="5" height="5" rx="1" />
+      <rect x="0" y="7" width="5" height="5" rx="1" /><rect x="7" y="7" width="5" height="5" rx="1" />
+    </svg>
+  );
 }
 
 // USDG glyph — the real Global Dollar mark (public/usdg.png). Used for every USDG amount.
