@@ -21,7 +21,7 @@ export const site = {
   // Do NOT paste real financial figures here unless verified. Use descriptors, not fake stats.
   links: {
     // TODO: replace with real URLs before launch.
-    app: "/app",
+    app: "/game", // the old passive-node dashboard is retired; the app is Grid Mine
     game: "/game",
     x: "https://x.com",
     github: "https://github.com/IceBox247/DRIP",

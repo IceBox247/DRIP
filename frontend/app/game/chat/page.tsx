@@ -43,10 +43,14 @@ const clock = (ts: number) => {
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 };
 
+type Row = { id: number; name: string; hue: number; body: string; created_at: string };
+const rowToMsg = (r: Row): Msg => ({ id: r.id, name: r.name, hue: r.hue, text: r.body, ts: Date.parse(r.created_at), you: r.name === "you" });
+
 export default function ChatPage() {
   const [msgs, setMsgs] = useState<Msg[]>(SEED);
   const [draft, setDraft] = useState("");
   const [online] = useState(() => 40 + Math.floor(Math.random() * 80));
+  const [live, setLive] = useState(false); // true once the Neon-backed API answers
   const nextId = useRef(SEED.length + 1);
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -56,28 +60,59 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs]);
 
-  // Simulated live chatter so the room feels alive in the demo.
+  // On mount, ask the API whether a database is wired. If so, go live; else stay in demo.
   useEffect(() => {
-    const tick = () => {
-      const name = HANDLES[Math.floor(Math.random() * HANDLES.length)];
-      const text = CHATTER[Math.floor(Math.random() * CHATTER.length)];
-      setMsgs((m) => [...m, { id: nextId.current++, name, hue: hueFor(name), text, ts: now() }].slice(-60));
-    };
-    const loop = () => {
-      const id = setTimeout(() => { tick(); schedule(); }, 5000 + Math.random() * 9000);
-      timer.current = id;
-    };
+    let alive = true;
+    fetch("/api/chat")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || !d?.enabled) return;
+        setLive(true);
+        if (Array.isArray(d.messages)) setMsgs(d.messages.map(rowToMsg));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Live mode: poll the API for new messages. Demo mode: simulate chatter locally.
+  useEffect(() => {
+    if (live) {
+      const id = setInterval(() => {
+        fetch("/api/chat")
+          .then((r) => r.json())
+          .then((d) => { if (d?.enabled && Array.isArray(d.messages)) setMsgs(d.messages.map(rowToMsg)); })
+          .catch(() => {});
+      }, 5000);
+      return () => clearInterval(id);
+    }
     const timer = { current: undefined as ReturnType<typeof setTimeout> | undefined };
-    const schedule = loop;
+    const schedule = () => {
+      timer.current = setTimeout(() => {
+        const name = HANDLES[Math.floor(Math.random() * HANDLES.length)];
+        const text = CHATTER[Math.floor(Math.random() * CHATTER.length)];
+        setMsgs((m) => [...m, { id: nextId.current++, name, hue: hueFor(name), text, ts: now() }].slice(-60));
+        schedule();
+      }, 5000 + Math.random() * 9000);
+    };
     schedule();
     return () => timer.current && clearTimeout(timer.current);
-  }, []);
+  }, [live]);
 
   const send = () => {
     const text = draft.trim();
     if (!text) return;
-    setMsgs((m) => [...m, { id: nextId.current++, name: "you", hue: 90, text, ts: now(), you: true }].slice(-60));
     setDraft("");
+    if (live) {
+      // Optimistic append; the next poll reconciles with the server copy.
+      setMsgs((m) => [...m, { id: nextId.current++, name: "you", hue: 90, text, ts: now(), you: true }].slice(-60));
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "you", body: text }),
+      }).catch(() => {});
+    } else {
+      setMsgs((m) => [...m, { id: nextId.current++, name: "you", hue: 90, text, ts: now(), you: true }].slice(-60));
+    }
   };
 
   return (
@@ -148,7 +183,9 @@ export default function ChatPage() {
             </button>
           </div>
           <p className="mt-2 text-center text-[11px] text-mute/60">
-            Posting as a guest · wallet-gated identity + persistence land in Phase 2
+            {live
+              ? "Posting as a guest · saved to the database. Wallet-gated identity lands with wallet connect."
+              : "Demo chat (not saved). Set DATABASE_URL in Vercel to go live."}
           </p>
         </div>
       </div>

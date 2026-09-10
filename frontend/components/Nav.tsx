@@ -39,10 +39,10 @@ export function Nav() {
             GitHub
           </a>
           <Link
-            href={site.links.app}
+            href={site.links.game}
             className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
           >
-            {site.launched ? "Launch app" : "Preview"}
+            Mine
           </Link>
         </div>
       </div>
