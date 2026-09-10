@@ -1,0 +1,90 @@
+name: Deploy Grid Mine
+
+# Deploy the Grid Mine contracts from your phone — no laptop needed.
+# GitHub runs Foundry in the cloud; you just press "Run workflow" and read the printed addresses.
+#
+# ONE-TIME SETUP (on the phone):
+#   1. Make a throwaway wallet (a fresh MetaMask account — NOT your main one). Copy its private key.
+#   2. Fund that wallet with a little TESTNET gas on Robinhood Chain testnet.
+#   3. Repo → Settings → Secrets and variables → Actions → New repository secret:
+#         name:  DEPLOYER_PRIVATE_KEY
+#         value: the throwaway key (0x...)
+#      (Optional, for mainnet only: USDG_ADDRESS, NVDA_ADDRESS, SWAP_ROUTER, RANDOMNESS.)
+#
+# TO DEPLOY:
+#   Repo → Actions → "Deploy Grid Mine" → Run workflow → pick "testnet" → Run.
+#   When it finishes, open the run → its Summary lists the 6 addresses. Paste them into Vercel.
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Which network to deploy to"
+        type: choice
+        options: [testnet, mainnet]
+        default: testnet
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Deploy contracts
+        working-directory: contracts
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          # Optional overrides (mainnet: point at the real tokens/router instead of mocks).
+          USDG: ${{ secrets.USDG_ADDRESS }}
+          NVDA: ${{ secrets.NVDA_ADDRESS }}
+          SWAP_ROUTER: ${{ secrets.SWAP_ROUTER }}
+          RANDOMNESS: ${{ secrets.RANDOMNESS }}
+        run: |
+          set -e
+          if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
+            echo "::error::DEPLOYER_PRIVATE_KEY secret is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+          if [ "${{ inputs.network }}" = "mainnet" ]; then
+            RPC="https://rpc.mainnet.chain.robinhood.com"
+            echo "::warning::Deploying to MAINNET. This uses the mock RNG unless RANDOMNESS is set — do NOT open to real players until secure randomness is wired (blocker #1)."
+          else
+            RPC="https://rpc.testnet.chain.robinhood.com"
+          fi
+          echo "Deploying to ${{ inputs.network }} ($RPC)"
+          forge script script/DeployGame.s.sol:DeployGame \
+            --rpc-url "$RPC" \
+            --private-key "$DEPLOYER_PRIVATE_KEY" \
+            --broadcast --slow | tee /tmp/deploy.log
+
+      - name: Collect addresses
+        if: always()
+        working-directory: contracts
+        run: |
+          {
+            echo "## Deployed to ${{ inputs.network }}"
+            echo ""
+            echo "Paste these into Vercel → Settings → Environment Variables, then redeploy."
+            echo ""
+            echo '```'
+            grep -E "USDG:|NVDA:|DripToken|GridMine|RefiningVault|StakeVault|MockSwapRouter|MockRandomness" /tmp/deploy.log || echo "No addresses found — check the deploy step log above for errors."
+            echo '```'
+            echo ""
+            echo "| Vercel env var | value |"
+            echo "|---|---|"
+            u=$(grep -E "USDG:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            n=$(grep -E "NVDA:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            d=$(grep -E "DripToken" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            g=$(grep -E "GridMine" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            r=$(grep -E "RefiningVault" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            s=$(grep -E "StakeVault" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            echo "| NEXT_PUBLIC_USDG_ADDRESS | $u |"
+            echo "| NEXT_PUBLIC_NVDA_ADDRESS | $n |"
+            echo "| NEXT_PUBLIC_DRIP_ADDRESS | $d |"
+            echo "| NEXT_PUBLIC_GRIDMINE_ADDRESS | $g |"
+            echo "| NEXT_PUBLIC_REFINING_ADDRESS | $r |"
+            echo "| NEXT_PUBLIC_STAKE_ADDRESS | $s |"
+          } >> "$GITHUB_STEP_SUMMARY"
