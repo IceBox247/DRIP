@@ -33,6 +33,18 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install pinned contract dependencies
+        working-directory: contracts
+        run: |
+          set -eo pipefail
+          # lib/ is gitignored (not in the repo), so fetch the exact versions the code was built with.
+          rm -rf lib && mkdir -p lib
+          git clone --recurse-submodules https://github.com/foundry-rs/forge-std lib/forge-std
+          git -C lib/forge-std checkout 16cb9c998736cab8f14aebd5199cdf6a02fde055
+          git -C lib/forge-std submodule update --init --recursive
+          git clone --branch v5.1.0 --depth 1 https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts
+          forge build   # fail here (red) if anything doesn't compile — no more silent success
+
       - name: Deploy contracts
         working-directory: contracts
         env:
@@ -43,7 +55,7 @@ jobs:
           SWAP_ROUTER: ${{ secrets.SWAP_ROUTER }}
           RANDOMNESS: ${{ secrets.RANDOMNESS }}
         run: |
-          set -e
+          set -eo pipefail   # so a forge failure fails the step (tee no longer masks it)
           if [ -z "$DEPLOYER_PRIVATE_KEY" ]; then
             echo "::error::DEPLOYER_PRIVATE_KEY secret is not set. Add it in Settings → Secrets → Actions."
             exit 1
@@ -59,6 +71,11 @@ jobs:
             --rpc-url "$RPC" \
             --private-key "$DEPLOYER_PRIVATE_KEY" \
             --broadcast --slow | tee /tmp/deploy.log
+          # A real deploy prints the GridMine address; if it's missing, fail loudly.
+          grep -qE "GridMine[: ]+0x[0-9a-fA-F]{40}" /tmp/deploy.log || {
+            echo "::error::Deploy produced no GridMine address — check the log above (usually: deployer wallet has no testnet gas, or RPC unreachable).";
+            exit 1;
+          }
 
       - name: Collect addresses
         if: always()
