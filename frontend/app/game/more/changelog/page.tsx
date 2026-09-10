@@ -6,24 +6,29 @@ export const metadata = { title: "Changelog — Drip" };
 const log = [
   {
     tag: "Now", state: "shipped", items: [
-      "Chat — live miner feed with a working composer (guest posting).",
-      "More menu — About, Changelog, Explore, Reserve, Rewards, Shield.",
-      "Explore — market, mining, staking, supply, activity, revenue & leaderboards.",
+      "Live on Robinhood testnet — GridMine, DripToken, RefiningVault, StakeVault + mock USDG/NVDA deployed.",
+      "Wallet connect — real wagmi picker (browser wallet + WalletConnect); shows your address.",
+      "Faucet + live balances — mint test USDG and see your on-chain USDG/DRIP update in the app.",
+      "Keeper — a per-minute Vercel cron closes rounds and processes rewards on-chain.",
+      "Chat — live miner feed backed by Neon; each browser/wallet has its own identity and messages persist.",
     ],
   },
   {
     tag: "Earlier", state: "shipped", items: [
-      "Mine — ORE-style 5×5 grid, Lite/Pro, 1% entry fee, 1-or-all, motherlode, refining.",
-      "Stake — deposit/withdraw demo for the stakers' slice.",
-      "Contracts — GridMine, DripToken, RefiningVault, StakeVault; tested against real USDG on a mainnet fork.",
+      "Winners earn NVDA + DRIP — the winners' cut is paid 6% DRIP + 4% tokenized NVIDIA (1-or-all).",
+      "Explore — market, mining, staking, supply, plus Activity (rounds/motherlodes) & Revenue tables + leaderboards.",
+      "Mine — ORE-style 5×5 grid, Lite/Pro, editable amount, 1% entry fee, 1-or-all, motherlode, refining; wait-for-miner + auto next round.",
+      "Stake & Trade — deposit/withdraw and swap screens.",
+      "More menu — About, Changelog, Explore, Reserve, Rewards, Shield.",
+      "Contracts tested end-to-end against real USDG on a mainnet fork.",
     ],
   },
   {
     tag: "Next", state: "planned", items: [
-      "Secure randomness (VRF or bonded commit–reveal) — the blocker for any real round.",
-      "Wallet connect + wire Mine/Stake/Trade to deployed contracts.",
-      "Trade — DRIP/USDG swap, scheduled buys & liquidity depth.",
-      "Neon-backed chat, persistent identity & on-chain stats indexing.",
+      "Wire Mine / Stake / Trade buttons to the deployed contracts (deposit, harvest, stake, swap).",
+      "Secure randomness (VRF or bonded commit–reveal) — the blocker before any mainnet round.",
+      "Trade — real DRIP/USDG swap, scheduled buys & liquidity depth.",
+      "On-chain stats indexing so Explore shows real rounds, revenue & leaderboards.",
     ],
   },
 ];
