@@ -233,7 +233,18 @@ export default function MinePage() {
       {!result && (
         <div className="px-4 pt-6">
           <div className="text-center">
-            <div className="text-5xl font-semibold tracking-tight text-white">{fmt(amount, 0)}</div>
+            {/* Editable — tap to type any amount, or use the quick buttons below. */}
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              value={amount || ""}
+              onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
+              placeholder="0"
+              aria-label="Deploy amount in USDG"
+              className="w-full bg-transparent text-center text-5xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
             <div className="mt-1 flex justify-center"><Usdg big /></div>
           </div>
           <div className="mt-5 grid grid-cols-4 gap-2">
@@ -259,13 +270,13 @@ export default function MinePage() {
             )}
             <Row label="ROUNDS"><span className="font-semibold text-mute">1</span></Row>
             <Row label="PER ROUND">
-              <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, 0)}</span>
+              <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
             </Row>
           </div>
 
           <button disabled={!canDeploy} onClick={deployNow}
             className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-            {mode === "pro" && selected.length === 0 ? "Select tiles to deploy" : `Deploy ${fmt(amount, 0)} USDG`}
+            {mode === "pro" && selected.length === 0 ? "Select tiles to deploy" : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
             <span>Wallet {fmt(usdg)} USDG</span>

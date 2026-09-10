@@ -23,7 +23,81 @@ const UNREFINED = [
   { a: "HA36…rpMB", v: 430 }, { a: "7wfh…VKse", v: 220 }, { a: "dripmaxi", v: 150 },
 ];
 
+// Deterministic pseudo-random (seeded by index) so server & client render identically — no hydration
+// mismatch. Real activity is indexed from chain (Neon) at launch.
+const rand = (n: number) => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
+const WINNERS = ["55nF…mqjh", "7xDY…RtXm", "8fB1…C5Kn", "B52R…9Giz", "58X7…UjdM", "5c4R…VHcq", "FiL", "Randomar"];
+
+type Act = {
+  r: number; tile: number; winners: number; deployed: number; vaulted: number; winnings: number;
+  solo: boolean; winner: string | null; ago: string; mother?: number;
+};
+
+const ROUNDS: Act[] = Array.from({ length: 14 }, (_, i) => {
+  const deployed = 460 + Math.round(rand(i + 1) * 120);
+  const solo = rand(i + 9) < 0.4;
+  return {
+    r: 399231 - i,
+    tile: Math.floor(rand(i + 3) * 25) + 1,
+    winners: 118 + Math.floor(rand(i + 5) * 12),
+    deployed,
+    vaulted: Math.round(deployed * 0.095),
+    winnings: Math.round(deployed * 0.9),
+    solo,
+    winner: solo ? WINNERS[i % WINNERS.length] : null,
+    ago: i === 0 ? "55 sec ago" : `${i + 1} min ago`,
+  };
+});
+
+const MOTHERLODES: Act[] = Array.from({ length: 9 }, (_, i) => {
+  const deployed = 480 + Math.round(rand(i + 20) * 380);
+  const solo = rand(i + 28) < 0.3;
+  const hrs = [4, 5, 9, 9, 24, 48, 48, 48, 72][i];
+  return {
+    r: 399032 - i * 90 - Math.floor(rand(i + 2) * 80),
+    tile: Math.floor(rand(i + 31) * 25) + 1,
+    winners: 115 + Math.floor(rand(i + 24) * 30),
+    deployed,
+    vaulted: Math.round(deployed * 0.095),
+    winnings: Math.round(deployed * 0.9),
+    mother: Math.round((2 + rand(i + 33) * 380) * 10) / 10,
+    solo,
+    winner: solo ? WINNERS[(i + 3) % WINNERS.length] : null,
+    ago: hrs < 24 ? `${hrs} hours ago` : `${Math.round(hrs / 24)} day${hrs >= 48 ? "s" : ""} ago`,
+  };
+});
+
+// Revenue tables — ORE-style (Buybacks / Winners / Marketing), each a list of recent transactions.
+const AGO = ["21 min ago", "39 min ago", "52 min ago", "1 hour ago", "1 hour ago", "1 hour ago", "2 hours ago", "2 hours ago", "3 hours ago"];
+const r2 = (x: number) => Math.round(x * 100) / 100;
+const r4 = (x: number) => Math.round(x * 1e4) / 1e4;
+type Tok = "usdg" | "drip" | "nvda";
+type Rev = { blurb: string; cols: string[]; toks: Tok[]; rows: { ago: string; vals: number[] }[] };
+const mkRev = (base: number, spread: number, fn: (s: number) => number[]): { ago: string; vals: number[] }[] =>
+  Array.from({ length: 9 }, (_, i) => { const s = r2(base + rand(i + 40) * spread); return { ago: AGO[i], vals: fn(s) }; });
+
+const REVENUE: Record<"buybacks" | "winners" | "marketing", Rev> = {
+  buybacks: {
+    blurb: "Protocol cut used to buy DRIP off the market — then burned + streamed to stakers.",
+    cols: ["Spent", "Burned", "Stakers"], toks: ["usdg", "drip", "drip"],
+    rows: mkRev(46, 8, (s) => [s, r2(s * 0.7), r2(s * 0.1)]),
+  },
+  winners: {
+    blurb: "The winners' slice of each cut — 6% as DRIP, 4% as NVDA (tokenized NVIDIA).",
+    cols: ["Cut", "DRIP", "NVDA"], toks: ["usdg", "drip", "nvda"],
+    rows: mkRev(46, 8, (s) => [s, r2(s * 0.06), r4((s * 0.04) / 176)]),
+  },
+  marketing: {
+    blurb: "The 1% entry fee, skimmed at deploy and withdrawn to the ops wallet.",
+    cols: ["Fee", "To ops"], toks: ["usdg", "usdg"],
+    rows: mkRev(4.6, 1.4, (s) => [s, s]),
+  },
+};
+const revDec = (t: Tok) => (t === "nvda" ? 4 : 2);
+
 export default function ExplorePage() {
+  const [act, setAct] = useState<"rounds" | "motherlodes">("rounds");
+  const [rev, setRev] = useState<"buybacks" | "winners" | "marketing">("buybacks");
   const [board, setBoard] = useState<"miners" | "stakers" | "unrefined">("miners");
   const rows = board === "miners" ? MINERS : board === "stakers" ? STAKERS : UNREFINED;
   const unit = board === "stakers" ? "DRIP staked" : board === "unrefined" ? "DRIP unrefined" : "USDG mined";
@@ -85,6 +159,103 @@ export default function ExplorePage() {
         </Grid>
       </Section>
 
+      {/* Activity — ORE-style Rounds / Motherlodes tables */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-mute">Activity</h2>
+          <div className="inline-flex rounded-full border border-line bg-panel p-0.5">
+            {(["rounds", "motherlodes"] as const).map((t) => (
+              <button key={t} onClick={() => setAct(t)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${act === t ? "bg-white text-ink" : "text-mute"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mb-3 text-xs text-mute">
+          {act === "rounds" ? "Recent mining rounds and winners." : "Recent rounds where the motherlode hit."}
+        </p>
+        <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
+          <table className="w-full min-w-[620px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line/60 text-[11px] uppercase tracking-wide text-mute">
+                <th className="px-3 py-2.5 font-medium">Round</th>
+                <th className="px-3 py-2.5 font-medium">Tile</th>
+                <th className="px-3 py-2.5 font-medium">Winner</th>
+                <th className="px-3 py-2.5 text-right font-medium">Winners</th>
+                <th className="px-3 py-2.5 text-right font-medium">Deployed</th>
+                <th className="px-3 py-2.5 text-right font-medium">Vaulted</th>
+                <th className="px-3 py-2.5 text-right font-medium">Winnings</th>
+                {act === "motherlodes" && <th className="px-3 py-2.5 text-right font-medium">Motherlode</th>}
+                <th className="px-3 py-2.5 text-right font-medium">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line/40">
+              {(act === "rounds" ? ROUNDS : MOTHERLODES).map((row) => (
+                <tr key={row.r} className="text-white/90">
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-mute">#{fmt(row.r)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-mute">#{row.tile}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5"><Winner solo={row.solo} name={row.winner} /></td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right">{row.winners}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{fmt(row.deployed)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{fmt(row.vaulted)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{fmt(row.winnings)}</td>
+                  {act === "motherlodes" && (
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right"><Drip />{fmt(row.mother ?? 0, 1)}</td>
+                  )}
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right text-mute">{row.ago}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Revenue — ORE-style Buybacks / Winners / Marketing transaction tables */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-mute">Revenue</h2>
+          <div className="inline-flex rounded-full border border-line bg-panel p-0.5">
+            {(["buybacks", "winners", "marketing"] as const).map((t) => (
+              <button key={t} onClick={() => setRev(t)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${rev === t ? "bg-white text-ink" : "text-mute"}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mb-3 text-xs text-mute">{REVENUE[rev].blurb}</p>
+        <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
+          <table className="w-full min-w-[480px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-line/60 text-[11px] uppercase tracking-wide text-mute">
+                <th className="px-3 py-2.5 font-medium">Time</th>
+                {REVENUE[rev].cols.map((c) => (
+                  <th key={c} className="px-3 py-2.5 text-right font-medium">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line/40">
+              {REVENUE[rev].rows.map((row, ri) => (
+                <tr key={ri} className="text-white/90">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-mute">{row.ago}</td>
+                  {row.vals.map((v, ci) => {
+                    const tk = REVENUE[rev].toks[ci];
+                    return (
+                      <td key={ci} className="whitespace-nowrap px-3 py-2.5 text-right">
+                        {tk === "usdg" ? <Usdg /> : tk === "drip" ? <Drip /> : null}
+                        {fmt(v, revDec(tk))}
+                        {tk === "nvda" ? " NVDA" : ""}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Leaderboard */}
       <div className="mt-2">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-mute">Leaderboard</h2>
@@ -135,4 +306,19 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
       <div className="mt-0.5 text-[11px] text-mute">{sub}</div>
     </div>
   );
+}
+
+function Winner({ solo, name }: { solo: boolean; name: string | null }) {
+  return solo && name ? (
+    <span className="text-white">{name}</span>
+  ) : (
+    <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink">Split</span>
+  );
+}
+/* eslint-disable @next/next/no-img-element */
+function Usdg() {
+  return <img src="/usdg.png" alt="USDG" width={12} height={12} className="mr-1 inline-block rounded-full align-[-2px]" />;
+}
+function Drip() {
+  return <img src="/logo.png" alt="DRIP" width={12} height={12} className="mr-1 inline-block rounded-full align-[-2px]" />;
 }
