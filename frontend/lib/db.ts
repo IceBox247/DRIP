@@ -1,11 +1,20 @@
 import { neon } from "@neondatabase/serverless";
 
 // Neon Postgres connection. Server-only — never import this from a client component.
-// When DATABASE_URL is unset (e.g. the demo deploy), `dbEnabled` is false and callers fall back to
-// their demo behavior instead of hitting a database.
-export const dbEnabled = !!process.env.DATABASE_URL;
+// The Neon Vercel integration adds several connection-string vars; accept whichever one is present
+// (prefer a pooled URL — the neon() HTTP client is happiest with the "-pooler" host). When none is
+// set (e.g. the plain demo deploy), `dbEnabled` is false and callers fall back to demo behavior.
+const connectionString =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  "";
 
-export const sql = dbEnabled ? neon(process.env.DATABASE_URL as string) : null;
+export const dbEnabled = !!connectionString;
+
+export const sql = dbEnabled ? neon(connectionString) : null;
 
 let ensured = false;
 /** Create tables on first use so a fresh Neon project works with no manual migration step. */
