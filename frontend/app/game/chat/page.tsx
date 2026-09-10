@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAccount } from "wagmi";
 import { AppChrome } from "@/components/AppChrome";
 
-// Chat — ORE-style live miner chat. Working DEMO: messages post locally and a simulated feed drips
-// in new lines so it feels alive. Wallet-gated posting + a real backend (Neon) are Phase 2; for now
-// you post as a guest handle. No chain, no persistence.
+// Chat — ORE-style live miner chat. Persists to Neon when DATABASE_URL is set (else a demo
+// simulation). Each browser gets its own guest handle (stored locally) until a wallet is connected,
+// so different people show as different senders — not all as "you".
 
-type Msg = { id: number; name: string; hue: number; text: string; ts: number; you?: boolean; system?: boolean };
+type Msg = { id: number; name: string; hue: number; text: string; ts: number; system?: boolean };
+const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 const now = () => Date.now();
 const HANDLES = ["55nF…mqjh", "7ibJ…PU4B", "NotZohran", "7chh…wC4f", "gridwhale", "5c4R…VHcq", "dripmaxi", "H8VM…66bA"];
@@ -44,13 +46,24 @@ const clock = (ts: number) => {
 };
 
 type Row = { id: number; name: string; hue: number; body: string; created_at: string };
-const rowToMsg = (r: Row): Msg => ({ id: r.id, name: r.name, hue: r.hue, text: r.body, ts: Date.parse(r.created_at), you: r.name === "you" });
+const rowToMsg = (r: Row): Msg => ({ id: r.id, name: r.name, hue: r.hue, text: r.body, ts: Date.parse(r.created_at) });
 
 export default function ChatPage() {
+  const { address } = useAccount();
   const [msgs, setMsgs] = useState<Msg[]>(SEED);
   const [draft, setDraft] = useState("");
   const [online] = useState(() => 40 + Math.floor(Math.random() * 80));
   const [live, setLive] = useState(false); // true once the Neon-backed API answers
+  // Per-browser guest identity (persists across reloads). A connected wallet overrides it.
+  const [guest] = useState(() => {
+    try {
+      const k = "drip_chat_handle";
+      let v = localStorage.getItem(k);
+      if (!v) { v = `guest-${Math.random().toString(16).slice(2, 6)}`; localStorage.setItem(k, v); }
+      return v;
+    } catch { return `guest-${Math.random().toString(16).slice(2, 6)}`; }
+  });
+  const myName = address ? short(address) : guest;
   const nextId = useRef(SEED.length + 1);
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -102,16 +115,17 @@ export default function ChatPage() {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
+    const mine: Msg = { id: nextId.current++, name: myName, hue: hueFor(myName), text, ts: now() };
     if (live) {
       // Optimistic append; the next poll reconciles with the server copy.
-      setMsgs((m) => [...m, { id: nextId.current++, name: "you", hue: 90, text, ts: now(), you: true }].slice(-60));
+      setMsgs((m) => [...m, mine].slice(-60));
       fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "you", body: text }),
+        body: JSON.stringify({ name: myName, body: text, addr: address ?? null }),
       }).catch(() => {});
     } else {
-      setMsgs((m) => [...m, { id: nextId.current++, name: "you", hue: 90, text, ts: now(), you: true }].slice(-60));
+      setMsgs((m) => [...m, mine].slice(-60));
     }
   };
 
@@ -131,35 +145,36 @@ export default function ChatPage() {
 
         {/* Feed */}
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          {msgs.map((m) =>
-            m.system ? (
+          {msgs.map((m) => {
+            const mine = m.name === myName;
+            return m.system ? (
               <div key={m.id} className="mx-auto w-fit rounded-full border border-line bg-panel px-3 py-1 text-center text-[11px] text-mute">
                 {m.text}
               </div>
             ) : (
-              <div key={m.id} className={`flex gap-2.5 ${m.you ? "flex-row-reverse" : ""}`}>
+              <div key={m.id} className={`flex gap-2.5 ${mine ? "flex-row-reverse" : ""}`}>
                 <span
                   className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-ink"
                   style={{ background: `hsl(${m.hue} 70% 65%)` }}
                 >
-                  {m.you ? "YOU" : initials(m.name)}
+                  {mine ? "YOU" : initials(m.name)}
                 </span>
-                <div className={`max-w-[75%] ${m.you ? "items-end text-right" : ""} flex flex-col`}>
+                <div className={`max-w-[75%] ${mine ? "items-end text-right" : ""} flex flex-col`}>
                   <div className="flex items-center gap-2 text-[11px] text-mute">
-                    <span className="font-semibold text-white/90">{m.you ? "You" : m.name}</span>
+                    <span className="font-semibold text-white/90">{mine ? "You" : m.name}</span>
                     <span>{clock(m.ts)}</span>
                   </div>
                   <div
                     className={`mt-1 inline-block rounded-2xl px-3.5 py-2 text-sm ${
-                      m.you ? "bg-lime text-ink" : "bg-panel text-white"
+                      mine ? "bg-lime text-ink" : "bg-panel text-white"
                     }`}
                   >
                     {m.text}
                   </div>
                 </div>
               </div>
-            )
-          )}
+            );
+          })}
           <div ref={endRef} />
         </div>
 
@@ -184,7 +199,7 @@ export default function ChatPage() {
           </div>
           <p className="mt-2 text-center text-[11px] text-mute/60">
             {live
-              ? "Posting as a guest · saved to the database. Wallet-gated identity lands with wallet connect."
+              ? `Posting as ${myName}${address ? " (wallet)" : " · connect a wallet for your address"} · saved`
               : "Demo chat (not saved). Set DATABASE_URL in Vercel to go live."}
           </p>
         </div>
