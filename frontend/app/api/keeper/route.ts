@@ -36,6 +36,23 @@ async function run() {
   const minOut = BigInt(process.env.KEEPER_MIN_OUT ?? "0");
   const actions: string[] = [];
 
+  // 0) On the mock randomness source, set a fresh random word so the winning tile varies each round.
+  //    (Real VRF/commit-reveal needs no keeper word — this is testnet-only.) RANDOMNESS_ADDRESS opt-in.
+  const rng = process.env.RANDOMNESS_ADDRESS as `0x${string}` | undefined;
+  if (rng) {
+    try {
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      const word = BigInt("0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""));
+      const setWordAbi = [{ type: "function", name: "setWord", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] }] as const;
+      const { request } = await pub.simulateContract({ address: rng, abi: setWordAbi, functionName: "setWord", args: [word], account });
+      const hash = await wallet.writeContract(request);
+      actions.push(`setWord ${hash}`);
+    } catch {
+      actions.push("setWord skipped");
+    }
+  }
+
   // 1) Close the open round if its window has elapsed (reverts otherwise — that's fine).
   try {
     const { request } = await pub.simulateContract({ ...gm, functionName: "closeRound", account });

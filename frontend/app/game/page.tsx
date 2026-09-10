@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppChrome } from "@/components/AppChrome";
+import { Faucet } from "@/components/Faucet";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -147,6 +148,9 @@ export default function MinePage() {
         <Stat label="MOTHERLODE" value={fmt(motherlode, 0)} gold border />
         <Stat label="TIME" value={result ? "00:00" : !started ? "--:--" : `${mm}:${ss}`} danger={started && !result && timeLeft <= 10} />
       </div>
+
+      {/* Live testnet balance + faucet (only when a wallet is connected and contracts are configured) */}
+      <Faucet />
 
       {/* Waiting state — the round is idle until the first miner deploys. */}
       {!started && !result && (

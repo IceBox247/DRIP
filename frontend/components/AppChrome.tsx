@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Logo } from "./Logo";
 import { site } from "@/lib/site";
@@ -100,13 +101,14 @@ function MoreIcon({ active }: { active?: boolean }) {
 }
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
-// Real wallet connect (wagmi). Connects the first available connector (injected/WalletConnect);
-// when none is available it stays a no-op label. Full deploy/harvest wiring comes once addresses
-// are configured — see lib/contracts.ts.
+// Real wallet connect (wagmi). Opens a small picker of available wallets. On mobile, browser wallets
+// (injected) usually aren't present — WalletConnect covers those, and it's only offered when
+// NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is set. Errors are shown instead of failing silently.
 function ConnectButton() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
+  const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
+  const [open, setOpen] = useState(false);
 
   if (isConnected && address) {
     return (
@@ -120,15 +122,46 @@ function ConnectButton() {
       </button>
     );
   }
+
+  const hasInjected = typeof window !== "undefined" && !!(window as unknown as { ethereum?: unknown }).ethereum;
+  const label = (c: { id: string; name: string }) =>
+    c.id === "walletConnect" ? "WalletConnect (mobile)" : c.name === "Injected" ? (hasInjected ? "Browser wallet" : "Browser wallet (none found)") : c.name;
+
   return (
-    <button
-      type="button"
-      disabled={isPending || connectors.length === 0}
-      onClick={() => connectors[0] && connect({ connector: connectors[0] })}
-      className="rounded-full bg-white/90 px-4 py-1.5 text-sm font-semibold text-ink disabled:opacity-60"
-    >
-      {isPending ? "Connecting…" : "Connect"}
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => setOpen((o) => !o)}
+        className="rounded-full bg-white/90 px-4 py-1.5 text-sm font-semibold text-ink disabled:opacity-60"
+      >
+        {isPending ? "Connecting…" : "Connect"}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-2 w-60 rounded-2xl border border-line bg-panel p-2 shadow-xl">
+            <div className="px-2 py-1 text-[11px] uppercase tracking-wide text-mute">Connect a wallet</div>
+            {connectors.map((c) => (
+              <button
+                key={c.uid}
+                onClick={() => { connect({ connector: c }); setOpen(false); }}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white hover:bg-panel2"
+              >
+                {label(c)}
+              </button>
+            ))}
+            {!connectors.some((c) => c.id === "walletConnect") && (
+              <div className="px-3 py-2 text-[11px] leading-relaxed text-mute">
+                On a phone browser? Set <span className="text-white">NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</span> in
+                Vercel to connect a mobile wallet, or open this site inside your wallet app&rsquo;s browser.
+              </div>
+            )}
+            {error && <div className="px-3 py-2 text-[11px] text-red-400">{error.message}</div>}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
