@@ -55,6 +55,10 @@ export const gridMineAbi = [
     type: "function", name: "deploy", stateMutability: "nonpayable",
     inputs: [{ name: "tile", type: "uint8" }, { name: "amount", type: "uint256" }], outputs: [],
   },
+  {
+    type: "function", name: "deployMany", stateMutability: "nonpayable",
+    inputs: [{ name: "tiles", type: "uint8[]" }, { name: "amounts", type: "uint256[]" }], outputs: [],
+  },
   { type: "function", name: "harvest", stateMutability: "nonpayable", inputs: [{ name: "round", type: "uint256" }], outputs: [] },
   {
     type: "function", name: "getRound", stateMutability: "view", inputs: [{ name: "round", type: "uint256" }],

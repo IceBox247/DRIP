@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { parseUnits, maxUint256 } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
 import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
@@ -31,12 +31,20 @@ const MINERS = [
 ];
 
 export default function MinePage() {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const connected = isConnected && contractsReady; // wallet connected + testnet contracts configured
   const chain = useLiveRound(connected); // live on-chain round state
   const live = connected && chain.ready; // showing real chain data
   const { writeContractAsync } = useWriteContract();
+  // Current USDG allowance for GridMine — so we only approve once (max), not every round.
+  const allowance = useReadContract({
+    address: (addresses.usdg || undefined) as `0x${string}` | undefined,
+    abi: erc20Abi, functionName: "allowance",
+    args: address && addresses.gridMine ? [address, addresses.gridMine as `0x${string}`] : undefined,
+    query: { enabled: live && !!address && !!addresses.usdg, refetchInterval: 10000 },
+  });
   const [txMsg, setTxMsg] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -73,8 +81,9 @@ export default function MinePage() {
     setSelected((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i]));
   };
 
-  // Live on-chain deploy: split the amount across every selected tile, approve the total once, then
-  // deploy to each tile. You choose one tile or many — the amount is divided evenly between them.
+  // Live on-chain deploy: one transaction for all selected tiles (deployMany). The amount is split
+  // evenly across the selected tiles. USDG is approved ONCE (max) — after that, deploys are a single
+  // signature each round, which matters when a round is only 60s.
   const doDeploy = async () => {
     if (!live) { deployNow(); return; }
     if (targets.length === 0) { setTxMsg("Select at least one tile to deploy."); return; }
@@ -84,16 +93,19 @@ export default function MinePage() {
       const per = total / n;
       if (per === BigInt(0)) { setTxMsg("Amount too small to split across that many tiles."); return; }
       const remainder = total - per * n; // dust from integer division → folded into the first tile
-      setTxMsg(`Confirm approve in your wallet…`);
-      await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, per * n + remainder] });
-      for (let i = 0; i < targets.length; i++) {
-        const amt = i === 0 ? per + remainder : per;
-        setTxMsg(`Confirm deploy ${i + 1} of ${targets.length}…`);
-        await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deploy", args: [targets[i], amt] });
+      const tilesArg = targets.map((t) => t); // uint8[]
+      const amountsArg = targets.map((_, i) => (i === 0 ? per + remainder : per)); // uint256[]
+      // Approve once (max) only if the current allowance can't cover this deploy.
+      const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
+      if (cur < total) {
+        setTxMsg("Approve USDG (one time)…");
+        await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, maxUint256] });
       }
+      setTxMsg(`Deploying to ${targets.length} tile${targets.length > 1 ? "s" : ""}…`);
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany", args: [tilesArg, amountsArg] });
       setTxMsg(`Deployed on-chain to ${targets.length} tile${targets.length > 1 ? "s" : ""} ✓`);
       setSelected([]);
-      setTimeout(() => chain.refetch(), 3000);
+      setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
     }
@@ -104,7 +116,8 @@ export default function MinePage() {
   // so any connected wallet (with gas) can drive the game — this stands in for the server keeper while
   // testing. On mainnet a keeper cron does this automatically every round.
   const advanceRound = async () => {
-    if (!live) return;
+    if (!live || advancing) return;
+    setAdvancing(true);
     const settling = chain.round; // the currently-open round that will settle on close
     try {
       if (addresses.randomness) {
@@ -127,6 +140,8 @@ export default function MinePage() {
       setTimeout(() => chain.refetch(), 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "advance failed");
+    } finally {
+      setAdvancing(false);
     }
   };
 
@@ -263,9 +278,10 @@ export default function MinePage() {
           <div className="mt-0.5 text-[11px] text-mute">
             On-chain rounds don&rsquo;t auto-advance without a keeper. Tap to settle it and start a fresh 60s round.
           </div>
-          <button onClick={advanceRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">
-            Start next round
+          <button onClick={advanceRound} disabled={advancing} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink disabled:opacity-60">
+            {advancing ? "Working…" : "Start next round"}
           </button>
+          {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
         </div>
       )}
 

@@ -210,6 +210,30 @@ contract GameTest is Test {
         assertEq(sv.earned(alice), 50 ether, "alice earned all rewards");
     }
 
+    function test_deployMany_oneTx() public {
+        uint8[] memory tiles = new uint8[](3);
+        uint256[] memory amts = new uint256[](3);
+        tiles[0] = 1; tiles[1] = 7; tiles[2] = 12;
+        amts[0] = 10 * U; amts[1] = 20 * U; amts[2] = 30 * U;
+        vm.prank(alice);
+        gridMine.deployMany(tiles, amts); // single transaction, three tiles
+
+        // Net after 1% fee: 9.9 / 19.8 / 29.7 USDG staked; 0.6 total admin.
+        assertEq(gridMine.tileTotal(1, 1), 99 * U / 10, "tile 1 net 9.9");
+        assertEq(gridMine.tileTotal(1, 7), 198 * U / 10, "tile 7 net 19.8");
+        assertEq(gridMine.tileTotal(1, 12), 297 * U / 10, "tile 12 net 29.7");
+        assertEq(gridMine.adminAccrued(), 6 * U / 10, "1% of 60 = 0.6 USDG");
+    }
+
+    function test_deployMany_rejectsBadInput() public {
+        uint8[] memory tiles = new uint8[](2);
+        uint256[] memory amts = new uint256[](1);
+        tiles[0] = 1; tiles[1] = 2; amts[0] = 10 * U;
+        vm.prank(alice);
+        vm.expectRevert(GridMine.BadInput.selector);
+        gridMine.deployMany(tiles, amts);
+    }
+
     function test_emptyRoundAdvances() public {
         vm.warp(block.timestamp + 61);
         gridMine.closeRound();

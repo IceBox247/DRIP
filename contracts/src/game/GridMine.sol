@@ -109,6 +109,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     event PausedSet(bool paused);
 
     error BadTile();
+    error BadInput();
     error ZeroAmount();
     error RoundNotOpen();
     error WindowClosed();
@@ -151,12 +152,41 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         if (tile >= TILES) revert BadTile();
         if (amount == 0) revert ZeroAmount();
         Round storage r = rounds[currentRound];
+        _openCheck(r);
+        usdg.safeTransferFrom(msg.sender, address(this), amount);
+        _record(r, tile, amount);
+    }
+
+    /// @notice Deploy onto several tiles in ONE transaction — one USDG transfer for the sum, then the
+    ///         per-tile accounting. Lets a player cover many tiles with a single signature (important
+    ///         when a round is only 60s). `tiles[i]` gets `amounts[i]`.
+    function deployMany(uint8[] calldata tiles, uint256[] calldata amounts) external nonReentrant {
+        if (paused) revert IsPaused();
+        uint256 n = tiles.length;
+        if (n == 0 || n != amounts.length) revert BadInput();
+        Round storage r = rounds[currentRound];
+        _openCheck(r);
+        uint256 gross;
+        for (uint256 i; i < n; i++) {
+            if (amounts[i] == 0) revert ZeroAmount();
+            if (tiles[i] >= TILES) revert BadTile();
+            gross += amounts[i];
+        }
+        usdg.safeTransferFrom(msg.sender, address(this), gross); // one transfer for the whole batch
+        for (uint256 i; i < n; i++) {
+            _record(r, tiles[i], amounts[i]);
+        }
+    }
+
+    function _openCheck(Round storage r) internal view {
         if (r.status != Status.Open) revert RoundNotOpen();
         if (block.timestamp >= r.startTime + ROUND_SECONDS) revert WindowClosed();
-        usdg.safeTransferFrom(msg.sender, address(this), amount);
-        // 1% entry fee is skimmed HERE, before funds enter the pool, so it never touches the
-        // win/loss math. Only the net 99% is staked. Accrued admin is withdrawn separately and is
-        // NOT part of any round's pot.
+    }
+
+    /// @dev Per-tile accounting after USDG is already in the contract. The 1% entry fee is skimmed
+    ///      HERE, before funds enter the pool, so it never touches the win/loss math; only the net
+    ///      99% is staked. Accrued admin is withdrawn separately and is NOT part of any round's pot.
+    function _record(Round storage r, uint8 tile, uint256 amount) internal {
         uint256 admin = (amount * ADMIN_BPS) / BPS;
         uint256 net = amount - admin;
         adminAccrued += admin;
