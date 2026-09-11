@@ -32,9 +32,11 @@ const MINERS = [
 
 export default function MinePage() {
   const { address, isConnected } = useAccount();
-  const connected = isConnected && contractsReady; // wallet connected + testnet contracts configured
-  const chain = useLiveRound(connected); // live on-chain round state
-  const live = connected && chain.ready; // showing real chain data
+  // Live on-chain round reads only need the RPC, not a wallet — so visitors see the REAL round before
+  // connecting; a wallet is only required to actually deploy. Falls back to the demo only when the
+  // contracts aren't configured or the chain isn't reachable.
+  const chain = useLiveRound(contractsReady);
+  const live = contractsReady && chain.ready; // showing real chain data (connected or not)
   const { writeContractAsync } = useWriteContract();
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
@@ -85,6 +87,7 @@ export default function MinePage() {
   // signature each round, which matters when a round is only 60s.
   const doDeploy = async () => {
     if (!live) { deployNow(); return; }
+    if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return; }
     if (targets.length === 0) { setTxMsg("Select at least one tile to deploy."); return; }
     try {
       const total = parseUnits(String(amount), 6);
@@ -388,12 +391,14 @@ export default function MinePage() {
 
           <button disabled={!canDeploy} onClick={doDeploy}
             className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-            {mode === "pro" && selected.length === 0
+            {live && !isConnected
+              ? "Connect wallet to deploy"
+              : mode === "pro" && selected.length === 0
               ? "Select tiles to deploy"
               : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${targets.length} tiles` : ""}`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
-            <span>{live ? "On-chain · testnet" : `Wallet ${fmt(usdg)} USDG`}</span>
+            <span>{live ? (isConnected ? "On-chain" : "Live round · connect to play") : `Wallet ${fmt(usdg)} USDG`}</span>
             <span>1% entry fee → {fmt(amount * gridMine.adminFeeBps / 10000, 2)} USDG</span>
           </div>
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
