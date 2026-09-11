@@ -31,6 +31,15 @@ export const gridMineAbi = [
   { type: "function", name: "currentRound", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "timeLeft", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "motherlodeDrip", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "ROUND_SECONDS", stateMutability: "view", inputs: [], outputs: [{ type: "uint32" }] },
+  {
+    type: "function", name: "tileTotal", stateMutability: "view",
+    inputs: [{ type: "uint256" }, { type: "uint8" }], outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function", name: "stakeOf", stateMutability: "view",
+    inputs: [{ type: "uint256" }, { type: "uint8" }, { type: "address" }], outputs: [{ type: "uint256" }],
+  },
   { type: "function", name: "closeRound", stateMutability: "nonpayable", inputs: [], outputs: [] },
   {
     type: "function", name: "processRewards", stateMutability: "nonpayable",

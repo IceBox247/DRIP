@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
+import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
-import { contractsReady } from "@/lib/contracts";
+import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
+import { useLiveRound } from "@/lib/useLiveRound";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -30,7 +32,11 @@ const MINERS = [
 
 export default function MinePage() {
   const { isConnected } = useAccount();
-  const live = isConnected && contractsReady; // wallet connected + testnet contracts configured
+  const connected = isConnected && contractsReady; // wallet connected + testnet contracts configured
+  const chain = useLiveRound(connected); // live on-chain round state
+  const live = connected && chain.ready; // showing real chain data
+  const { writeContractAsync } = useWriteContract();
+  const [txMsg, setTxMsg] = useState<string | null>(null);
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -53,11 +59,36 @@ export default function MinePage() {
   const pool = useMemo(() => tiles.reduce((s, t) => s + t.mine + t.others, 0), [tiles]);
   const targets = mode === "lite" ? Array.from({ length: N }, (_, i) => i) : selected;
   const busy = !!result || revealing;
-  const canDeploy = !busy && amount > 0 && amount <= usdg && targets.length > 0;
+  // When live, the header + grid + timer reflect the chain; otherwise the demo drives them.
+  const tilesShown: Tile[] = live ? chain.tiles.map((a) => ({ mine: 0, others: a })) : tiles;
+  const poolShown = live ? chain.pool : pool;
+  const timeShown = live ? chain.timeLeft : timeLeft;
+  const motherlodeShown = live ? chain.motherlode : motherlode;
+  const roundShown = live ? chain.round : round;
+  const canDeploy = !busy && amount > 0 && targets.length > 0 && (live ? selected.length === 1 : amount <= usdg);
 
   const toggle = (i: number) => {
     if (busy) return;
     setSelected((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i]));
+  };
+
+  // Live on-chain deploy: approve USDG, then deploy to the single selected tile.
+  const doDeploy = async () => {
+    if (!live) { deployNow(); return; }
+    if (selected.length !== 1) { setTxMsg("Pick exactly one tile to deploy on-chain."); return; }
+    const tile = selected[0];
+    try {
+      setTxMsg("Confirm approve in your wallet…");
+      const amt = parseUnits(String(amount), 6);
+      await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, amt] });
+      setTxMsg("Confirm deploy in your wallet…");
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deploy", args: [tile, amt] });
+      setTxMsg("Deployed on-chain ✓");
+      setSelected([]);
+      setTimeout(() => chain.refetch(), 3000);
+    } catch (e) {
+      setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
+    }
   };
 
   const deployNow = useCallback(() => {
@@ -145,13 +176,13 @@ export default function MinePage() {
   // Populate the grid on the client (avoids an SSR/client hydration mismatch from Math.random).
   useEffect(() => { setTiles(seeded()); }, []);
 
-  // Countdown — always running (ORE-style). At zero, run the reveal animation.
+  // Countdown — demo only (when live, the chain + keeper drive the round). At zero, run the reveal.
   useEffect(() => {
-    if (busy) return;
+    if (busy || live) return;
     if (timeLeft <= 0) { startReveal(); return; }
     const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(id);
-  }, [timeLeft, busy, startReveal]);
+  }, [timeLeft, busy, live, startReveal]);
 
   // Auto-advance to the next round a few seconds after settlement.
   useEffect(() => {
@@ -160,16 +191,16 @@ export default function MinePage() {
     return () => clearTimeout(id);
   }, [result, nextRound]);
 
-  const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
-  const ss = String(timeLeft % 60).padStart(2, "0");
+  const mm = String(Math.floor(timeShown / 60)).padStart(2, "0");
+  const ss = String(timeShown % 60).padStart(2, "0");
 
   return (
     <AppChrome>
       {/* Stat header */}
       <div className="grid grid-cols-3 px-4 py-6 text-center">
-        <Stat label="DEPLOYED" value={fmt(pool)} accent />
-        <Stat label="MOTHERLODE" value={fmt(motherlode, 0)} gold border />
-        <Stat label="TIME" value={result ? "00:00" : revealing ? "···" : `${mm}:${ss}`} danger={!busy && timeLeft <= 10} />
+        <Stat label="DEPLOYED" value={fmt(poolShown)} accent />
+        <Stat label="MOTHERLODE" value={fmt(motherlodeShown, 0)} gold border />
+        <Stat label="TIME" value={result ? "00:00" : revealing ? "···" : `${mm}:${ss}`} danger={!busy && timeShown <= 10} />
       </div>
 
       {/* Live testnet balance + faucet (only when a wallet is connected and contracts are configured) */}
@@ -220,7 +251,7 @@ export default function MinePage() {
 
           {mode === "pro" && (
             <div className="grid grid-cols-5 gap-1.5 px-4 pt-3">
-              {tiles.map((t, i) => {
+              {tilesShown.map((t, i) => {
                 const sel = selected.includes(i);
                 const total = t.mine + t.others;
                 const lit = revealing && revealTile === i; // the flashing highlight during the reveal
@@ -316,17 +347,22 @@ export default function MinePage() {
             </Row>
           </div>
 
-          <button disabled={!canDeploy} onClick={deployNow}
+          <button disabled={!canDeploy} onClick={doDeploy}
             className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-            {mode === "pro" && selected.length === 0 ? "Select tiles to deploy" : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG`}
+            {live && selected.length !== 1
+              ? "Select one tile to deploy on-chain"
+              : mode === "pro" && selected.length === 0
+                ? "Select tiles to deploy"
+                : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
-            <span>{live ? "Practice round" : `Wallet ${fmt(usdg)} USDG`}</span>
+            <span>{live ? "On-chain · testnet" : `Wallet ${fmt(usdg)} USDG`}</span>
             <span>1% entry fee → {fmt(amount * gridMine.adminFeeBps / 10000, 2)} USDG</span>
           </div>
+          {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
           {live && (
             <p className="mt-1 text-center text-[11px] text-mute/70">
-              This is still a practice round — it doesn&rsquo;t spend your real USDG yet. On-chain deploy is coming.
+              Deploy spends your real testnet USDG. Winnings &amp; refining still read the demo — wiring next.
             </p>
           )}
         </div>
