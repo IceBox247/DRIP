@@ -1,13 +1,14 @@
 "use client";
 
-import { useReadContract, useReadContracts } from "wagmi";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { addresses, gridMineAbi } from "./contracts";
 import { gridMine as params } from "./site";
 
-// Reads the live on-chain round state from GridMine so the Mine screen can show REAL data
-// (deployed pool, per-tile amounts, time left, motherlode) when a wallet is connected on testnet.
-// Falls back to the demo when not `enabled` or while data is loading.
+// Reads the live on-chain round state from GridMine so the Mine screen can show REAL data:
+// the deployed pool, each tile's total, the connected wallet's OWN stake per tile, time left, and
+// the motherlode. Falls back to the demo when not `enabled` or while data is loading.
 export function useLiveRound(enabled: boolean) {
+  const { address } = useAccount();
   const gm = { address: (addresses.gridMine || undefined) as `0x${string}` | undefined, abi: gridMineAbi } as const;
 
   const round = useReadContract({ ...gm, functionName: "currentRound", query: { enabled, refetchInterval: 4000 } });
@@ -24,7 +25,20 @@ export function useLiveRound(enabled: boolean) {
     query: { enabled: enabled && rid !== undefined, refetchInterval: 4000 },
   });
 
+  // The connected wallet's own stake on each tile this round (stakeOf[round][tile][you]).
+  const mineReads = useReadContracts({
+    contracts:
+      rid !== undefined && address
+        ? Array.from({ length: params.tiles }, (_, i) => ({ ...gm, functionName: "stakeOf" as const, args: [rid, i, address] as const }))
+        : [],
+    query: { enabled: enabled && rid !== undefined && !!address, refetchInterval: 4000 },
+  });
+
   const tileAmts = (tiles.data ?? []).map((r) => (r.status === "success" ? Number(r.result as bigint) / 1e6 : 0));
+  const mineAmts = Array.from({ length: params.tiles }, (_, i) => {
+    const r = mineReads.data?.[i];
+    return r && r.status === "success" ? Number(r.result as bigint) / 1e6 : 0;
+  });
   const pool = tileAmts.reduce((s, v) => s + v, 0);
 
   return {
@@ -32,8 +46,9 @@ export function useLiveRound(enabled: boolean) {
     round: rid !== undefined ? Number(rid) : 0,
     pool,
     tiles: tileAmts,
+    mine: mineAmts, // your own stake per tile
     timeLeft: timeLeft.data !== undefined ? Number(timeLeft.data as bigint) : 0,
     motherlode: motherlode.data !== undefined ? Number(motherlode.data as bigint) / 1e18 : 0,
-    refetch: () => { round.refetch(); tiles.refetch(); timeLeft.refetch(); motherlode.refetch(); },
+    refetch: () => { round.refetch(); tiles.refetch(); mineReads.refetch(); timeLeft.refetch(); motherlode.refetch(); },
   };
 }

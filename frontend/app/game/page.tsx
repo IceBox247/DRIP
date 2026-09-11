@@ -72,8 +72,11 @@ export default function MinePage() {
   const pool = useMemo(() => tiles.reduce((s, t) => s + t.mine + t.others, 0), [tiles]);
   const targets = mode === "lite" ? Array.from({ length: N }, (_, i) => i) : selected;
   const busy = !!result || revealing;
-  // When live, the header + grid + timer reflect the chain; otherwise the demo drives them.
-  const tilesShown: Tile[] = live ? chain.tiles.map((a) => ({ mine: 0, others: a })) : tiles;
+  // When live, the header + grid + timer reflect the chain; otherwise the demo drives them. Each tile
+  // shows the wallet's OWN stake (mine) and the rest (others), so the total is mine + others.
+  const tilesShown: Tile[] = live
+    ? chain.tiles.map((tot, i) => ({ mine: chain.mine[i] ?? 0, others: Math.max(0, tot - (chain.mine[i] ?? 0)) }))
+    : tiles;
   const poolShown = live ? chain.pool : pool;
   const timeShown = live ? chain.timeLeft : timeLeft;
   const motherlodeShown = live ? chain.motherlode : motherlode;
@@ -85,29 +88,36 @@ export default function MinePage() {
     setSelected((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i]));
   };
 
-  // Live on-chain deploy: one transaction for all selected tiles (deployMany). The amount is split
-  // evenly across the selected tiles. USDG is approved ONCE (max) — after that, deploys are a single
-  // signature each round, which matters when a round is only 60s.
+  // Live on-chain deploy: the amount is PER TILE (like ORE) — each selected tile gets `amount`, so
+  // the total spent is amount × tiles. One transaction (deployMany). USDG is approved ONCE (max), then
+  // deploys are a single signature per round. An explicit gas limit is passed because the wallet can
+  // mis-estimate deployMany while the approve is still pending (the "intrinsic gas too low" error).
   const doDeploy = async () => {
     if (!live) { deployNow(); return; }
     if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return; }
     if (targets.length === 0) { setTxMsg("Select at least one tile to deploy."); return; }
     try {
-      const total = parseUnits(String(amount), 6);
+      const perTile = parseUnits(String(amount), 6); // amount is per tile
+      if (perTile === BigInt(0)) { setTxMsg("Enter an amount greater than 0."); return; }
       const n = BigInt(targets.length);
-      const per = total / n;
-      if (per === BigInt(0)) { setTxMsg("Amount too small to split across that many tiles."); return; }
-      const remainder = total - per * n; // dust from integer division → folded into the first tile
+      const total = perTile * n; // total USDG spent = per-tile × number of tiles
       const tilesArg = targets.map((t) => t); // uint8[]
-      const amountsArg = targets.map((_, i) => (i === 0 ? per + remainder : per)); // uint256[]
+      const amountsArg = targets.map(() => perTile); // uint256[] — same amount on each tile
       // Approve once (max) only if the current allowance can't cover this deploy.
       const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
       if (cur < total) {
         setTxMsg("Approve USDG (one time)…");
-        await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, maxUint256] });
+        await writeContractAsync({
+          address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
+          args: [addresses.gridMine as `0x${string}`, maxUint256], gas: BigInt(120000),
+        });
       }
       setTxMsg(`Deploying to ${targets.length} tile${targets.length > 1 ? "s" : ""}…`);
-      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany", args: [tilesArg, amountsArg] });
+      await writeContractAsync({
+        address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany",
+        args: [tilesArg, amountsArg],
+        gas: BigInt(500000) + BigInt(140000) * n, // generous fixed limit so the wallet can't under-set it
+      });
       setTxMsg(`Deployed on-chain to ${targets.length} tile${targets.length > 1 ? "s" : ""} ✓`);
       setSelected([]);
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
@@ -306,6 +316,12 @@ export default function MinePage() {
                         : "border-line bg-panel/40 hover:border-mute/50"
                     } ${t.mine > 0 && !lit ? "bg-lime/5" : ""} ${revealing && !lit ? "opacity-50" : ""}`}>
                     {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
+                    {/* Your own stake on this tile (top) — shown above the tile's total (bottom), like ORE. */}
+                    {t.mine > 0 && (
+                      <div className="absolute left-1 top-1 flex items-center gap-0.5 text-[10px] font-semibold text-lime">
+                        <Usdg /> {fmt(t.mine, t.mine >= 1 ? 2 : 3)}
+                      </div>
+                    )}
                     <div className="absolute bottom-1 left-1 flex items-center gap-0.5 text-[10px] font-medium text-mute">
                       <Usdg /> {fmt(total, total >= 1 ? 1 : 3)}
                     </div>
@@ -377,8 +393,11 @@ export default function MinePage() {
               </Row>
             )}
             <Row label="ROUNDS"><span className="font-semibold text-mute">1</span></Row>
-            <Row label="PER ROUND">
+            <Row label="PER TILE">
               <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
+            </Row>
+            <Row label="TOTAL">
+              <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}</span>
             </Row>
             <Row label="REWARDS">
               <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
@@ -398,16 +417,16 @@ export default function MinePage() {
               ? "Connect wallet to deploy"
               : mode === "pro" && selected.length === 0
               ? "Select tiles to deploy"
-              : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${targets.length} tiles` : ""}`}
+              : `Deploy ${fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${fmt(amount, amount % 1 ? 2 : 0)}/tile × ${targets.length}` : ""}`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
             <span>{live ? (isConnected ? "On-chain" : "Live round · connect to play") : `Wallet ${fmt(usdg)} USDG`}</span>
-            <span>1% entry fee → {fmt(amount * gridMine.adminFeeBps / 10000, 2)} USDG</span>
+            <span>1% entry fee → {fmt(amount * Math.max(1, targets.length) * gridMine.adminFeeBps / 10000, 2)} USDG</span>
           </div>
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
           {live && (
             <p className="mt-1 text-center text-[11px] text-mute/70">
-              Deploy spends your real testnet USDG. Winnings &amp; refining still read the demo — wiring next.
+              Amount is <strong>per tile</strong> — total = amount × tiles. Winnings &amp; refining still read the demo (wiring next).
             </p>
           )}
         </div>
