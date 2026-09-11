@@ -26,6 +26,9 @@ const MAINNET = {
   refining: "0x93D0b1F57075403bfD289A58850a8331a3a281Ee",
   stake: "0x6CE30eFA833D207ce8f82797dA1E706b1739Ec11",
   randomness: "0x97ba2e34574fAe6B7bD7420a1dB1875CEc937Ae5",
+  // PonsSwapAdapter (GridMine.router()) — public swapExactIn routes USDG→DRIP via the Pons curve so
+  // players can buy DRIP in-app. Selling is not routed (the bonding curve is buy-only pre-graduation).
+  adapter: "0xc03f52E5b83bA89863Afc3343d506E3224aDA3a9",
 } as const;
 
 export const addresses = {
@@ -36,7 +39,20 @@ export const addresses = {
   refining: (process.env.NEXT_PUBLIC_REFINING_ADDRESS || MAINNET.refining) as `0x${string}` | "",
   stake: (process.env.NEXT_PUBLIC_STAKE_ADDRESS || MAINNET.stake) as `0x${string}` | "",
   randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS || MAINNET.randomness) as `0x${string}` | "",
+  adapter: (process.env.NEXT_PUBLIC_ADAPTER_ADDRESS || MAINNET.adapter) as `0x${string}` | "",
 };
+
+// PonsSwapAdapter: swapExactIn(tokenIn, tokenOut, amountIn, minOut) → amountOut (sent to caller).
+export const swapAdapterAbi = [
+  {
+    type: "function", name: "swapExactIn", stateMutability: "nonpayable",
+    inputs: [
+      { name: "tokenIn", type: "address" }, { name: "tokenOut", type: "address" },
+      { name: "amountIn", type: "uint256" }, { name: "minOut", type: "uint256" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;
 
 /** True once the game contracts are deployed and their addresses are configured. */
 export const contractsReady = !!addresses.gridMine && !!addresses.usdg;
