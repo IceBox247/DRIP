@@ -8,6 +8,7 @@ import { Faucet } from "@/components/Faucet";
 import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
 import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
+import { usePendingWinnings } from "@/lib/usePendingWinnings";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -46,6 +47,9 @@ export default function MinePage() {
   const chain = useLiveRound(contractsReady);
   const live = contractsReady && chain.ready; // showing real chain data (connected or not)
   const liveMiners = useLiveMiners(chain.round, live); // real participants in the current round
+  // Unclaimed winnings across every settled round the wallet played (pre-harvest), so you can SEE and
+  // harvest each round — not just the latest one.
+  const pending = usePendingWinnings(live && isConnected);
   const { writeContractAsync } = useWriteContract();
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
@@ -109,10 +113,14 @@ export default function MinePage() {
   // RefiningVault; Refined = DRIP in your wallet; NVDA = NVDA in your wallet. USDG pot is claimed
   // via Harvest (per settled round), so there's no running "USDG won" to read when live.
   const num = (v: unknown, dec: number) => (v !== undefined ? Number(v as bigint) / 10 ** dec : 0);
-  const unrefinedShown = live ? num(refiningClaimable.data, 18) : unrefined;
-  const claimedShown = live ? num(dripBal.data, 18) : claimed;
-  const nvdaWonShown = live ? num(nvdaBal.data, 18) : nvdaWon;
-  const usdgWonShown = live ? 0 : usdgWon;
+  const unrefinedShown = live ? num(refiningClaimable.data, 18) : unrefined; // DRIP harvested into the vault, refinable now
+  const claimedShown = live ? num(dripBal.data, 18) : claimed; // refined DRIP in wallet
+  const nvdaWonShown = live ? num(nvdaBal.data, 18) : nvdaWon; // NVDA in wallet
+  const usdgWonShown = live ? pending.totalUsdg : usdgWon; // USDG still to harvest (claimable)
+  // Summary glance numbers (deploy panel's REWARDS row + overlay): total DRIP/NVDA you could walk away
+  // with = what's already yours (vault/wallet) plus what's still waiting to be harvested.
+  const dripAvailShown = live ? unrefinedShown + pending.totalDrip : unrefined;
+  const nvdaAvailShown = live ? nvdaWonShown + pending.totalNvda : nvdaWon;
   const canDeploy = !busy && amount > 0 && targets.length > 0 && (live ? true : amount <= usdg);
 
   const toggle = (i: number) => {
@@ -198,10 +206,29 @@ export default function MinePage() {
       setTxMsg(`Harvesting round #${round}…`);
       await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(round)], gas: BigInt(400000) });
       setTxMsg(`Harvested round #${round} ✓`);
-      setTimeout(() => { chain.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
+      setTimeout(() => { chain.refetch(); pending.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "harvest failed");
     }
+  };
+
+  // Harvest EVERY round with unclaimed winnings, one signature each (rounds 1, 2, 3… — not just the
+  // latest). USDG & NVDA land in your wallet; DRIP moves to "unrefined" (refine it below to claim).
+  const harvestAll = async () => {
+    if (!isConnected || pending.rounds.length === 0) return;
+    const roundsToDo = pending.rounds.map((r) => r.round);
+    for (let i = 0; i < roundsToDo.length; i++) {
+      const r = roundsToDo[i];
+      try {
+        setTxMsg(`Harvesting round #${r} (${i + 1}/${roundsToDo.length})…`);
+        await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(r)], gas: BigInt(400000) });
+      } catch (e) {
+        setTxMsg(e instanceof Error ? e.message.slice(0, 140) : `harvest of round #${r} failed`);
+        return; // stop the batch on the first failure/rejection
+      }
+    }
+    setTxMsg(`Harvested ${roundsToDo.length} round${roundsToDo.length > 1 ? "s" : ""} ✓`);
+    setTimeout(() => { chain.refetch(); pending.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
   };
 
   // Refine `pct`% of the DRIP sitting in the RefiningVault into the wallet (minus the 10% tax). Live
@@ -512,9 +539,9 @@ export default function MinePage() {
               <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
                 <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWonShown, 2)}</span>
                 <span className="text-mute">+</span>
-                <span className="flex items-center gap-1"><Drip /> {fmt(unrefinedShown, 4)}</span>
+                <span className="flex items-center gap-1"><Drip /> {fmt(dripAvailShown, 4)}</span>
                 <span className="text-mute">+</span>
-                <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaWonShown, 4)}</span>
+                <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaAvailShown, 4)}</span>
                 <span className="text-mute/70">›</span>
               </button>
             </Row>
@@ -535,7 +562,7 @@ export default function MinePage() {
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
           {live && (
             <p className="mt-1 text-center text-[11px] text-mute/70">
-              Amount is <strong>per tile</strong> — total = amount × tiles. Winnings &amp; refining still read the demo (wiring next).
+              Amount is <strong>per tile</strong> — total = amount × tiles. Winnings are live: harvest each settled round below, then refine your DRIP.
             </p>
           )}
         </div>
@@ -543,6 +570,41 @@ export default function MinePage() {
 
       {/* Winnings */}
       <div className="mx-4 mt-6 rounded-2xl border border-line bg-panel p-4">
+        {/* Claimable (pre-harvest) winnings — what each settled round you won still owes you. Shows
+            BEFORE you harvest, and lets you harvest any round (1, 2, 3…), not just the latest. */}
+        {live && pending.rounds.length > 0 && (
+          <div className="mb-4 rounded-xl border border-lime/40 bg-lime/10 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-white">🎉 You won — harvest to claim</div>
+              <div className="flex items-center gap-2 text-[11px] text-mute">{pending.rounds.length} round{pending.rounds.length > 1 ? "s" : ""}</div>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {pending.rounds.map((r) => (
+                <div key={r.round} className="flex items-center justify-between rounded-lg border border-line bg-ink/40 px-3 py-2 text-xs">
+                  <div>
+                    <div className="font-semibold text-white">Round #{r.round}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-mute">
+                      {r.usdg > 0 && <span className="flex items-center gap-1"><Usdg /> {fmt(r.usdg, 2)}</span>}
+                      {r.drip > 0 && <span className="flex items-center gap-1"><Drip /> {fmt(r.drip, 3)}</span>}
+                      {r.nvda > 0 && <span className="flex items-center gap-1"><Nvda /> {fmt(r.nvda, 4)}</span>}
+                    </div>
+                  </div>
+                  <button onClick={() => harvest(r.round)}
+                    className="shrink-0 rounded-lg bg-lime px-3 py-1.5 text-xs font-semibold text-ink">Harvest</button>
+                </div>
+              ))}
+            </div>
+            {pending.rounds.length > 1 && (
+              <button onClick={harvestAll}
+                className="mt-2 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">
+                Harvest all {pending.rounds.length} rounds ({pending.rounds.length} signatures)
+              </button>
+            )}
+            <div className="mt-2 text-[11px] text-mute">
+              Harvesting sends USDG &amp; NVDA to your wallet and moves your DRIP to <span className="text-white">Unrefined</span> below — refine it to claim.
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Unrefined DRIP</div>
@@ -562,13 +624,11 @@ export default function MinePage() {
           </div>
           <div className="flex items-center gap-1 text-xl font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 4)}</div>
         </div>
-        {/* When live, if you were on a settled round's winning tile, Harvest pulls your USDG pot and
-            credits your DRIP/NVDA. Then Refine sends the DRIP to your wallet (minus the 10% tax). */}
-        {live && roundShown > 1 && (
-          <button onClick={() => harvest(roundShown - 1)}
-            className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 py-3 text-sm font-semibold text-lime">
-            Harvest round #{roundShown - 1} winnings
-          </button>
+        {/* Nothing to harvest right now (live) — a friendly note so the section isn't just balances. */}
+        {live && pending.rounds.length === 0 && (
+          <div className="mt-3 rounded-xl border border-line bg-ink/40 px-3 py-2.5 text-center text-[11px] text-mute">
+            No unclaimed winnings. Win a round (stake on the winning tile) and it&rsquo;ll show here to harvest.
+          </div>
         )}
         <button onClick={() => (live ? doRefine(100) : setShowRewards(true))} disabled={unrefinedShown <= 0}
           className="mt-3 w-full rounded-xl bg-lime py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
@@ -672,10 +732,14 @@ export default function MinePage() {
             </div>
 
             <button
-              onClick={() => { if (live) { harvest(roundShown - 1); setShowRewards(false); } else { claimUsdg(); setShowRewards(false); } }}
-              disabled={live ? roundShown <= 1 : usdgWon <= 0}
+              onClick={() => { if (live) { harvestAll(); setShowRewards(false); } else { claimUsdg(); setShowRewards(false); } }}
+              disabled={live ? pending.rounds.length === 0 : usdgWon <= 0}
               className="mt-4 w-full rounded-2xl bg-white py-4 text-base font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-              {live ? `Harvest round #${roundShown - 1}` : usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
+              {live
+                ? pending.rounds.length > 0
+                  ? `Harvest ${pending.rounds.length} round${pending.rounds.length > 1 ? "s" : ""} · ${fmt(pending.totalUsdg, 2)} USDG`
+                  : "Nothing to harvest"
+                : usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
             </button>
           </div>
         </div>

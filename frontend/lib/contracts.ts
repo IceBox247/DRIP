@@ -55,6 +55,10 @@ export const gridMineAbi = [
     type: "function", name: "stakeOf", stateMutability: "view",
     inputs: [{ type: "uint256" }, { type: "uint8" }, { type: "address" }], outputs: [{ type: "uint256" }],
   },
+  // Per-round, per-player claim flags — so the app can tell what's still HARVESTABLE (unclaimed).
+  { type: "function", name: "usdgClaimed", stateMutability: "view", inputs: [{ type: "uint256" }, { type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "dripClaimed", stateMutability: "view", inputs: [{ type: "uint256" }, { type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "nvdaClaimed", stateMutability: "view", inputs: [{ type: "uint256" }, { type: "address" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "closeRound", stateMutability: "nonpayable", inputs: [], outputs: [] },
   {
     type: "function", name: "processRewards", stateMutability: "nonpayable",
