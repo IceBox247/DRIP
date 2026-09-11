@@ -26,6 +26,12 @@ const seeded = (): Tile[] => { const o = seedOthers(); return Array.from({ lengt
 const fmt = (n: number, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`; // 0x1234…abcd
 
+// RefiningVault: DRIP won accrues here; refine (claim) sends it to your wallet minus the 10% tax.
+const refiningAbi = [
+  { type: "function", name: "claimable", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
+] as const;
+
 const MINERS = [
   { a: "55nF…mqjh", t: 25, v: 0.63 }, { a: "7ibJ…PU4B", t: 15, v: 0.6 }, { a: "7chh…wC4f", t: 25, v: 0.59 },
   { a: "5c4R…VHcq", t: 15, v: 0.47 }, { a: "8bc6…7rti", t: 25, v: 0.33 }, { a: "NotZohran", t: 15, v: 0.3 },
@@ -48,7 +54,25 @@ export default function MinePage() {
     args: address && addresses.gridMine ? [address, addresses.gridMine as `0x${string}`] : undefined,
     query: { enabled: live && !!address && !!addresses.usdg, refetchInterval: 10000 },
   });
+  // Real winnings reads: refinable DRIP (RefiningVault.claimable), + DRIP/NVDA wallet balances.
+  const refiningClaimable = useReadContract({
+    address: (addresses.refining || undefined) as `0x${string}` | undefined,
+    abi: refiningAbi, functionName: "claimable",
+    args: address ? [address] : undefined,
+    query: { enabled: live && !!address && !!addresses.refining, refetchInterval: 6000 },
+  });
+  const dripBal = useReadContract({
+    address: (addresses.drip || undefined) as `0x${string}` | undefined,
+    abi: erc20Abi, functionName: "balanceOf", args: address ? [address] : undefined,
+    query: { enabled: live && !!address && !!addresses.drip, refetchInterval: 6000 },
+  });
+  const nvdaBal = useReadContract({
+    address: (addresses.nvda || undefined) as `0x${string}` | undefined,
+    abi: erc20Abi, functionName: "balanceOf", args: address ? [address] : undefined,
+    query: { enabled: live && !!address && !!addresses.nvda, refetchInterval: 6000 },
+  });
   const [txMsg, setTxMsg] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -81,6 +105,14 @@ export default function MinePage() {
   const timeShown = live ? chain.timeLeft : timeLeft;
   const motherlodeShown = live ? chain.motherlode : motherlode;
   const roundShown = live ? chain.round : round;
+  // Winnings: real on-chain reads when live, demo state otherwise. Unrefined = DRIP in the
+  // RefiningVault; Refined = DRIP in your wallet; NVDA = NVDA in your wallet. USDG pot is claimed
+  // via Harvest (per settled round), so there's no running "USDG won" to read when live.
+  const num = (v: unknown, dec: number) => (v !== undefined ? Number(v as bigint) / 10 ** dec : 0);
+  const unrefinedShown = live ? num(refiningClaimable.data, 18) : unrefined;
+  const claimedShown = live ? num(dripBal.data, 18) : claimed;
+  const nvdaWonShown = live ? num(nvdaBal.data, 18) : nvdaWon;
+  const usdgWonShown = live ? 0 : usdgWon;
   const canDeploy = !busy && amount > 0 && targets.length > 0 && (live ? true : amount <= usdg);
 
   const toggle = (i: number) => {
@@ -123,6 +155,71 @@ export default function MinePage() {
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
+    }
+  };
+
+  // Settle the finished round and process its rewards (the keeper's job — this button drives it while
+  // testing): seed a fresh random word, closeRound() (picks the winner, opens the next round), then
+  // processRewards() (swaps the cut to DRIP/NVDA and distributes). Winners then Harvest to claim.
+  const settleAndProcess = async () => {
+    if (!live || settling) return;
+    if (!isConnected) { setTxMsg("Connect your wallet to settle."); return; }
+    setSettling(true);
+    const settled = chain.round; // the open, expired round that will close
+    try {
+      if (addresses.randomness) {
+        try {
+          const bytes = new Uint8Array(32);
+          crypto.getRandomValues(bytes);
+          const word = BigInt("0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""));
+          const setWordAbi = [{ type: "function", name: "setWord", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] }] as const;
+          setTxMsg("Seeding randomness…");
+          await writeContractAsync({ address: addresses.randomness as `0x${string}`, abi: setWordAbi, functionName: "setWord", args: [word], gas: BigInt(80000) });
+        } catch { /* non-fatal */ }
+      }
+      setTxMsg("Settling round…");
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "closeRound", gas: BigInt(1200000) });
+      setTxMsg("Buying & distributing DRIP/NVDA…");
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "processRewards", args: [BigInt(settled), BigInt(0), BigInt(0)], gas: BigInt(2000000) });
+      setTxMsg("Round settled ✓ — winners can now Harvest.");
+      setTimeout(() => chain.refetch(), 3000);
+    } catch (e) {
+      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "settle failed");
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  // Winners pull their payout for a settled round: USDG pot (+ DRIP credited to the RefiningVault and
+  // NVDA sent to the wallet once rewards are processed).
+  const harvest = async (round: number) => {
+    if (!isConnected || !round) return;
+    try {
+      setTxMsg(`Harvesting round #${round}…`);
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(round)], gas: BigInt(400000) });
+      setTxMsg(`Harvested round #${round} ✓`);
+      setTimeout(() => { chain.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
+    } catch (e) {
+      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "harvest failed");
+    }
+  };
+
+  // Refine `pct`% of the DRIP sitting in the RefiningVault into the wallet (minus the 10% tax). Live
+  // path calls RefiningVault.claim; otherwise runs the demo refine.
+  const doRefine = async (pct: number) => {
+    if (!live) { claim(pct); setShowRewards(false); return; }
+    if (!isConnected) { setTxMsg("Connect your wallet to refine."); return; }
+    const claimable = refiningClaimable.data as bigint | undefined;
+    if (!claimable || claimable === BigInt(0)) { setTxMsg("Nothing to refine yet."); return; }
+    const amt = (claimable * BigInt(pct)) / BigInt(100);
+    try {
+      setTxMsg("Refining DRIP…");
+      await writeContractAsync({ address: addresses.refining as `0x${string}`, abi: refiningAbi, functionName: "claim", args: [amt], gas: BigInt(300000) });
+      setTxMsg("Refined ✓ — DRIP in your wallet.");
+      setShowRewards(false);
+      setTimeout(() => { refiningClaimable.refetch(); dripBal.refetch(); }, 3000);
+    } catch (e) {
+      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "refine failed");
     }
   };
 
@@ -254,8 +351,16 @@ export default function MinePage() {
           over automatically (the contract settles the finished round inside deployMany). ORE-style —
           no keeper, no "next round" button; deploying drives the game forward. */}
       {live && timeShown === 0 && (
-        <div className="mx-4 mt-4 rounded-2xl border border-line bg-panel/60 px-4 py-3 text-center text-[12px] text-mute">
-          Round #{roundShown} is settling — deploy to start the next round.
+        <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
+          <div className="text-sm font-semibold text-white">Round #{roundShown} ended</div>
+          <div className="mt-0.5 text-[11px] text-mute">
+            Settle it to pick the winner, buy &amp; distribute DRIP/NVDA, and open the next round. (A keeper does this automatically for live players — this button drives it while testing.)
+          </div>
+          <button onClick={settleAndProcess} disabled={settling}
+            className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink disabled:opacity-60">
+            {settling ? "Settling…" : "Settle round & pay winners"}
+          </button>
+          {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
         </div>
       )}
 
@@ -405,11 +510,11 @@ export default function MinePage() {
             </Row>
             <Row label="REWARDS">
               <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
-                <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWon, 2)}</span>
+                <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWonShown, 2)}</span>
                 <span className="text-mute">+</span>
-                <span className="flex items-center gap-1"><Drip /> {fmt(unrefined, 4)}</span>
+                <span className="flex items-center gap-1"><Drip /> {fmt(unrefinedShown, 4)}</span>
                 <span className="text-mute">+</span>
-                <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaWon, 4)}</span>
+                <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaWonShown, 4)}</span>
                 <span className="text-mute/70">›</span>
               </button>
             </Row>
@@ -441,12 +546,12 @@ export default function MinePage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Unrefined DRIP</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(unrefined, 4)}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(unrefinedShown, 4)}</div>
             <div className="mt-0.5 text-[11px] text-mute">won — refine to claim</div>
           </div>
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Refined DRIP</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(claimed, 4)}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(claimedShown, 4)}</div>
             <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
           </div>
         </div>
@@ -455,11 +560,19 @@ export default function MinePage() {
             <div className="text-[11px] uppercase tracking-wide text-mute">NVDA won</div>
             <div className="mt-0.5 text-[11px] text-mute">4% of each round&rsquo;s cut buys NVDA for winners</div>
           </div>
-          <div className="flex items-center gap-1 text-xl font-semibold text-white"><Nvda /> {fmt(nvdaWon, 4)}</div>
+          <div className="flex items-center gap-1 text-xl font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 4)}</div>
         </div>
-        <button onClick={() => setShowRewards(true)} disabled={unrefined <= 0}
+        {/* When live, if you were on a settled round's winning tile, Harvest pulls your USDG pot and
+            credits your DRIP/NVDA. Then Refine sends the DRIP to your wallet (minus the 10% tax). */}
+        {live && roundShown > 1 && (
+          <button onClick={() => harvest(roundShown - 1)}
+            className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 py-3 text-sm font-semibold text-lime">
+            Harvest round #{roundShown - 1} winnings
+          </button>
+        )}
+        <button onClick={() => (live ? doRefine(100) : setShowRewards(true))} disabled={unrefinedShown <= 0}
           className="mt-3 w-full rounded-xl bg-lime py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
-          {unrefined > 0 ? "Refine & claim" : "Nothing to refine yet"}
+          {unrefinedShown > 0 ? "Refine & claim" : "Nothing to refine yet"}
         </button>
         <div className="mt-2 text-center text-[11px] text-mute">Refining taxes 10% to holders who haven&rsquo;t claimed — hold longer, earn more.</div>
       </div>
@@ -534,35 +647,35 @@ export default function MinePage() {
 
             <div className="mt-6 space-y-3 text-sm">
               <Row label="You receive">
-                <span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined * claimPct / 100 * (1 - gridMine.refineFeeBps / 10000), 4)}</span>
+                <span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefinedShown * claimPct / 100 * (1 - gridMine.refineFeeBps / 10000), 4)}</span>
               </Row>
               <Row label={`Refining fee (${gridMine.refineFeeBps / 100}%)`}>
-                <span className="flex items-center gap-1 font-semibold text-mute"><Drip /> {fmt(unrefined * claimPct / 100 * (gridMine.refineFeeBps / 10000), 4)}</span>
+                <span className="flex items-center gap-1 font-semibold text-mute"><Drip /> {fmt(unrefinedShown * claimPct / 100 * (gridMine.refineFeeBps / 10000), 4)}</span>
               </Row>
             </div>
 
             <button
-              onClick={() => { claim(claimPct); setShowRewards(false); }}
-              disabled={unrefined <= 0}
+              onClick={() => doRefine(claimPct)}
+              disabled={unrefinedShown <= 0}
               className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-              {unrefined > 0 ? "Claim DRIP" : "Nothing to claim"}
+              {unrefinedShown > 0 ? "Claim DRIP" : "Nothing to claim"}
             </button>
 
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-white">Balances</h3>
               <div className="mt-3 space-y-3 text-sm">
-                <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined, 6)}</span></Row>
-                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimed, 6)}</span></Row>
-                <Row label="NVDA won"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWon, 6)}</span></Row>
-                <Row label="USDG won"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWon)}</span></Row>
+                <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefinedShown, 6)}</span></Row>
+                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimedShown, 6)}</span></Row>
+                <Row label="NVDA won"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 6)}</span></Row>
+                <Row label="USDG won"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWonShown)}</span></Row>
               </div>
             </div>
 
             <button
-              onClick={() => { claimUsdg(); setShowRewards(false); }}
-              disabled={usdgWon <= 0}
+              onClick={() => { if (live) { harvest(roundShown - 1); setShowRewards(false); } else { claimUsdg(); setShowRewards(false); } }}
+              disabled={live ? roundShown <= 1 : usdgWon <= 0}
               className="mt-4 w-full rounded-2xl bg-white py-4 text-base font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-              {usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
+              {live ? `Harvest round #${roundShown - 1}` : usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
             </button>
           </div>
         </div>
