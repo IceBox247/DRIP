@@ -128,19 +128,26 @@ jobs:
             echo "Paste these into Vercel → Settings → Environment Variables, then redeploy."
             echo ""
             echo '```'
-            grep -E "USDG:|NVDA:|DripToken|GridMine|RefiningVault|StakeVault|MockSwapRouter|MockRandomness" /tmp/deploy.log || echo "No addresses found — check the deploy step log above for errors."
+            grep -E "USDG=|NVDA=|DripToken|GridMine|RefiningVault|StakeVault|MockSwapRouter|PonsSwapAdapter|Pons curve|NVDA v4 pool|MockRandomness|CommitReveal" /tmp/deploy.log || echo "No addresses found — check the deploy step log above for errors."
             echo '```'
             echo ""
+            # In pons mode USDG/NVDA are the real tokens passed in (echoed on the MAINNET: line);
+            # in mock mode they're deployed (MockERC20 USDG:/NVDA: lines). Try both.
+            cfg=$(grep -E "^MAINNET:" /tmp/deploy.log | tail -1)
+            u=$(echo "$cfg" | grep -oiE "USDG=0x[0-9a-fA-F]{40}" | grep -oE "0x[0-9a-fA-F]{40}")
+            n=$(echo "$cfg" | grep -oiE "NVDA=0x[0-9a-fA-F]{40}" | grep -oE "0x[0-9a-fA-F]{40}")
+            [ -z "$u" ] && u=$(grep -E "MockERC20 USDG:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            [ -z "$n" ] && n=$(grep -E "MockERC20 NVDA:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            d=$(grep -E "DripToken:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            g=$(grep -E "GridMine:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            r=$(grep -E "RefiningVault:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            s=$(grep -E "StakeVault:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            rng=$(grep -E "MockRandomness:|CommitRevealRandomness:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            pons=$(grep -E "PonsSwapAdapter:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            mockr=$(grep -E "MockSwapRouter:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
             echo "| Vercel env var | value |"
             echo "|---|---|"
-            u=$(grep -E "USDG:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            n=$(grep -E "NVDA:" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            d=$(grep -E "DripToken" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            g=$(grep -E "GridMine" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            r=$(grep -E "RefiningVault" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            s=$(grep -E "StakeVault" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            rng=$(grep -E "MockRandomness|CommitRevealRandomness" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
-            router=$(grep -E "MockSwapRouter" /tmp/deploy.log | grep -oE "0x[0-9a-fA-F]{40}" | tail -1)
+            echo "| NEXT_PUBLIC_CHAIN_ID | $([ "${{ inputs.network }}" = "mainnet" ] && echo 4663 || echo 46630) |"
             echo "| NEXT_PUBLIC_USDG_ADDRESS | $u |"
             echo "| NEXT_PUBLIC_NVDA_ADDRESS | $n |"
             echo "| NEXT_PUBLIC_DRIP_ADDRESS | $d |"
@@ -149,12 +156,11 @@ jobs:
             echo "| NEXT_PUBLIC_STAKE_ADDRESS | $s |"
             echo "| NEXT_PUBLIC_RANDOMNESS_ADDRESS | $rng |"
             echo ""
-            if grep -q "SEED FAILED" /tmp/deploy.log; then
-              echo "> ⚠️ **Router not seeded** — the deployer didn't hold the DRIP token. Send DRIP (your"
-              echo "> FLYCOINHUNT) to the swap router **$router** from the wallet that holds it, or the"
-              echo "> per-round DRIP/NVDA buys will revert."
+            if [ -n "$pons" ]; then
+              echo "> ✅ **Real Pons integration.** Swap router (PonsSwapAdapter): **$pons** — buys DRIP from the Pons curve and NVDA from its Uniswap v4 pool. No seeding needed."
+            elif grep -q "SEED FAILED" /tmp/deploy.log; then
+              echo "> ⚠️ **Mock router not seeded** — send DRIP to **$mockr** from the wallet that holds it, or per-round buys revert."
             else
-              echo "> Swap router (seeded): **$router**"
+              echo "> Mock swap router (seeded): **$mockr** — test router, not real pools."
             fi
-            echo "> NVDA buy uses a mock NVDA at the address shown above."
           } >> "$GITHUB_STEP_SUMMARY"
