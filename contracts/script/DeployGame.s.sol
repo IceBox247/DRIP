@@ -106,11 +106,13 @@ contract DeployGame is Script {
             MockSwapRouter(swapRouter).setRate(vm.envOr("SWAP_RATE_BPS", uint256(1e16)));
             uint256 seedDrip = vm.envOr("SEED_DRIP", uint256(0)) * 1 ether;
             if (seedDrip == 0) seedDrip = externalDrip ? 100_000 ether : cap / 10;
-            // Best-effort: the deployer must hold the DRIP to seed. If it doesn't (e.g. an existing
-            // token held by another wallet), this is skipped — send DRIP to the router manually.
-            try IERC20(dripAddr).transfer(swapRouter, seedDrip) returns (bool) {
+            // Only seed if the deployer actually holds enough DRIP — checked up front so the script
+            // never reverts. If it doesn't (e.g. an existing token held by another wallet), we skip
+            // and the deployer sends DRIP to the router manually afterwards.
+            if (IERC20(dripAddr).balanceOf(deployer) >= seedDrip) {
+                IERC20(dripAddr).transfer(swapRouter, seedDrip);
                 console2.log("Seeded router with DRIP:", seedDrip);
-            } catch {
+            } else {
                 console2.log("SEED FAILED - send DRIP manually to the router:", swapRouter);
             }
             // Mint mock NVDA liquidity to the router (real NVDA is a fixed on-chain token).

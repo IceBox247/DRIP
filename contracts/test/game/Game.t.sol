@@ -234,9 +234,32 @@ contract GameTest is Test {
         gridMine.deployMany(tiles, amts);
     }
 
-    function test_emptyRoundAdvances() public {
-        vm.warp(block.timestamp + 61);
+    function test_emptyRoundWaitsForFirstDeploy() public {
+        // Clock only starts on the first deploy — an empty round has no window to close.
+        assertEq(gridMine.timeLeft(), 60, "full clock shown, not counting");
+        vm.warp(block.timestamp + 120);
+        vm.expectRevert(GridMine.WindowNotElapsed.selector);
         gridMine.closeRound();
-        assertEq(gridMine.currentRound(), 2, "advanced");
+        assertEq(gridMine.currentRound(), 1, "still round 1 - nobody deployed");
+    }
+
+    function test_deployRollsOverFinishedRound() public {
+        // Round flows with NO keeper and NO button: deploying into a finished round settles it and
+        // opens a fresh one, all in the deploy tx.
+        vm.prank(alice);
+        gridMine.deploy(7, 100 * U); // starts the clock for round 1
+        assertEq(gridMine.currentRound(), 1);
+
+        rand.setWord(65557); // tile 7 wins round 1
+        vm.warp(block.timestamp + 61); // round 1's window elapses
+
+        vm.prank(bob);
+        gridMine.deploy(3, 50 * U); // rolls round 1 over, lands in round 2
+
+        assertEq(gridMine.currentRound(), 2, "auto-advanced to round 2");
+        GridMine.Round memory r1 = gridMine.getRound(1);
+        assertEq(uint8(r1.status), 2, "round 1 settled");
+        assertEq(r1.winningTile, 7, "round 1 winner picked");
+        assertEq(gridMine.tileTotal(2, 3), 495 * U / 10, "bob's 49.5 net landed in round 2");
     }
 }

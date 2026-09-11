@@ -44,7 +44,6 @@ export default function MinePage() {
     query: { enabled: live && !!address && !!addresses.usdg, refetchInterval: 10000 },
   });
   const [txMsg, setTxMsg] = useState<string | null>(null);
-  const [advancing, setAdvancing] = useState(false);
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -108,40 +107,6 @@ export default function MinePage() {
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
-    }
-  };
-
-  // Advance the on-chain round: (optionally) seed a fresh random word, close the expired round, and
-  // process rewards for the round that just settled. `closeRound`/`processRewards` are permissionless,
-  // so any connected wallet (with gas) can drive the game — this stands in for the server keeper while
-  // testing. On mainnet a keeper cron does this automatically every round.
-  const advanceRound = async () => {
-    if (!live || advancing) return;
-    setAdvancing(true);
-    const settling = chain.round; // the currently-open round that will settle on close
-    try {
-      if (addresses.randomness) {
-        try {
-          const bytes = new Uint8Array(32);
-          crypto.getRandomValues(bytes);
-          const word = BigInt("0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""));
-          const setWordAbi = [{ type: "function", name: "setWord", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] }] as const;
-          setTxMsg("Seeding randomness…");
-          await writeContractAsync({ address: addresses.randomness as `0x${string}`, abi: setWordAbi, functionName: "setWord", args: [word] });
-        } catch { /* non-fatal — closeRound still works with the last word */ }
-      }
-      setTxMsg("Closing round…");
-      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "closeRound" });
-      try {
-        setTxMsg("Processing rewards…");
-        await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "processRewards", args: [BigInt(settling), BigInt(0), BigInt(0)] });
-      } catch { /* nothing to process (empty round) */ }
-      setTxMsg("New round started ✓");
-      setTimeout(() => chain.refetch(), 3000);
-    } catch (e) {
-      setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "advance failed");
-    } finally {
-      setAdvancing(false);
     }
   };
 
@@ -269,19 +234,12 @@ export default function MinePage() {
       {/* Live testnet balance + faucet (only when a wallet is connected and contracts are configured) */}
       <Faucet />
 
-      {/* On-chain round control. When live and the round window has elapsed, the round is frozen until
-          someone calls closeRound() — this button does it (permissionless) so a fresh round starts.
-          On mainnet a keeper cron does this automatically; this is for testing without a keeper. */}
+      {/* When live and the round's window has elapsed, it just waits for the next deploy to roll it
+          over automatically (the contract settles the finished round inside deployMany). ORE-style —
+          no keeper, no "next round" button; deploying drives the game forward. */}
       {live && timeShown === 0 && (
-        <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
-          <div className="text-sm font-semibold text-white">Round #{roundShown} ended</div>
-          <div className="mt-0.5 text-[11px] text-mute">
-            On-chain rounds don&rsquo;t auto-advance without a keeper. Tap to settle it and start a fresh 60s round.
-          </div>
-          <button onClick={advanceRound} disabled={advancing} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink disabled:opacity-60">
-            {advancing ? "Working…" : "Start next round"}
-          </button>
-          {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
+        <div className="mx-4 mt-4 rounded-2xl border border-line bg-panel/60 px-4 py-3 text-center text-[12px] text-mute">
+          Round #{roundShown} is settling — deploy to start the next round.
         </div>
       )}
 

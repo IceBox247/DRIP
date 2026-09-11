@@ -151,8 +151,9 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         if (paused) revert IsPaused();
         if (tile >= TILES) revert BadTile();
         if (amount == 0) revert ZeroAmount();
+        _rollIfElapsed(); // auto-settle a finished round + open a fresh one, in this same tx
         Round storage r = rounds[currentRound];
-        _openCheck(r);
+        _startClockIfFirst(r);
         usdg.safeTransferFrom(msg.sender, address(this), amount);
         _record(r, tile, amount);
     }
@@ -164,23 +165,35 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         if (paused) revert IsPaused();
         uint256 n = tiles.length;
         if (n == 0 || n != amounts.length) revert BadInput();
+        _rollIfElapsed(); // auto-settle a finished round + open a fresh one, in this same tx
         Round storage r = rounds[currentRound];
-        _openCheck(r);
         uint256 gross;
         for (uint256 i; i < n; i++) {
             if (amounts[i] == 0) revert ZeroAmount();
             if (tiles[i] >= TILES) revert BadTile();
             gross += amounts[i];
         }
+        _startClockIfFirst(r);
         usdg.safeTransferFrom(msg.sender, address(this), gross); // one transfer for the whole batch
         for (uint256 i; i < n; i++) {
             _record(r, tiles[i], amounts[i]);
         }
     }
 
-    function _openCheck(Round storage r) internal view {
+    /// @dev If the current round's 60s window has elapsed, settle it and open a fresh one — so the
+    ///      NEXT deploy lands in a new round automatically. This is what makes rounds flow with no
+    ///      keeper and no manual "next round" step: deploying drives the game forward.
+    function _rollIfElapsed() internal {
+        Round storage r = rounds[currentRound];
+        if (r.status == Status.Open && r.startTime != 0 && block.timestamp >= r.startTime + ROUND_SECONDS) {
+            _close(currentRound);
+        }
+    }
+
+    /// @dev The 60s clock starts on the FIRST deploy into a round (ORE-style), not when it opened.
+    function _startClockIfFirst(Round storage r) internal {
         if (r.status != Status.Open) revert RoundNotOpen();
-        if (block.timestamp >= r.startTime + ROUND_SECONDS) revert WindowClosed();
+        if (r.startTime == 0) r.startTime = uint64(block.timestamp);
     }
 
     /// @dev Per-tile accounting after USDG is already in the contract. The 1% entry fee is skimmed
@@ -197,11 +210,19 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         emit Deployed(currentRound, msg.sender, tile, net);
     }
 
+    /// @notice Settle the current round if its window has elapsed and open the next. Permissionless —
+    ///         a keeper MAY call this to settle exactly at 60s, but it is not required: deploying rolls
+    ///         a finished round over automatically (see _rollIfElapsed).
     function closeRound() external nonReentrant {
         uint256 rid = currentRound;
         Round storage r = rounds[rid];
         if (r.status != Status.Open) revert RoundNotOpen();
-        if (block.timestamp < r.startTime + ROUND_SECONDS) revert WindowNotElapsed();
+        if (r.startTime == 0 || block.timestamp < r.startTime + ROUND_SECONDS) revert WindowNotElapsed();
+        _close(rid);
+    }
+
+    function _close(uint256 rid) internal {
+        Round storage r = rounds[rid];
         if (r.totalIn == 0) {
             r.status = Status.Settled;
             r.rewardsProcessed = true;
@@ -373,7 +394,9 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     }
 
     function timeLeft() external view returns (uint256) {
-        uint256 endsAt = rounds[currentRound].startTime + ROUND_SECONDS;
+        uint64 start = rounds[currentRound].startTime;
+        if (start == 0) return ROUND_SECONDS; // not started — waiting for the first deploy
+        uint256 endsAt = start + ROUND_SECONDS;
         return block.timestamp >= endsAt ? 0 : endsAt - block.timestamp;
     }
 
@@ -395,9 +418,12 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         return segs[lo].user;
     }
 
+    // A fresh round opens with startTime = 0 = "clock not started". The 60s countdown begins on the
+    // FIRST deploy (ORE-style), and the round then rolls over automatically on the next deploy after
+    // it elapses — no keeper or "next round" button needed to keep play flowing.
     function _openRound() internal {
         uint256 rid = ++currentRound;
-        rounds[rid].startTime = uint64(block.timestamp);
+        rounds[rid].startTime = 0;
         rounds[rid].status = Status.Open;
         emit RoundOpened(rid, block.timestamp);
     }
