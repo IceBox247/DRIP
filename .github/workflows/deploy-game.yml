@@ -95,7 +95,15 @@ jobs:
           done
           if [ "${{ inputs.network }}" = "mainnet" ]; then
             RPC="https://rpc.mainnet.chain.robinhood.com"
-            echo "::warning::Deploying to MAINNET. This uses the mock RNG unless RANDOMNESS is set — do NOT open to real players until secure randomness is wired (blocker #1)."
+            # On mainnet, force the REAL Pons integration and the real tokens unless explicitly
+            # overridden — so a plain "network: mainnet" run can never fall back to mocks.
+            SWAP_MODE=pons
+            : "${USDG:=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168}"
+            : "${NVDA:=0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC}"
+            : "${DRIP:=0x8f519e3e55b44014d6dd323bb3de561bf6cb6f1c}"
+            export SWAP_MODE USDG NVDA DRIP
+            echo "MAINNET: swap_mode=pons, USDG=$USDG, NVDA=$NVDA, DRIP=$DRIP"
+            echo "::warning::Deploying to MAINNET with the REAL Pons curve + NVDA v4 pool. Uses mock RNG unless RANDOMNESS is set — controlled test only, not public (blocker #1)."
           else
             RPC="https://rpc.testnet.chain.robinhood.com"
           fi
