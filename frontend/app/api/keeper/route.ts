@@ -62,10 +62,16 @@ async function run() {
     actions.push("closeRound skipped (window not elapsed)");
   }
 
-  // 2) Process rewards for any recently-settled, unprocessed round.
+  // 2) Process rewards for ANY settled, unprocessed round — not just the last two. Rounds can be
+  //    skipped when several settle between keeper ticks (a fast chain), leaving their DRIP/NVDA
+  //    unbought, so scan a bounded window back and catch up oldest-first. processRewards is
+  //    idempotent (reverts if already processed → simulate fails → skipped), so this is safe.
   const current = (await pub.readContract({ ...gm, functionName: "currentRound" })) as bigint;
-  for (const r of [current - BigInt(1), current - BigInt(2)]) {
-    if (r < BigInt(1)) continue;
+  const LOOKBACK = BigInt(60);
+  const floor = current > LOOKBACK ? current - LOOKBACK : BigInt(1);
+  let processed = 0;
+  for (let r = floor; r < current; r = r + BigInt(1)) {
+    if (processed >= 8) break; // keep within the function's time budget; the next tick continues
     try {
       const round = (await pub.readContract({ ...gm, functionName: "getRound", args: [r] })) as {
         status: number; rewardsProcessed: boolean;
@@ -74,9 +80,10 @@ async function run() {
         const { request } = await pub.simulateContract({ ...gm, functionName: "processRewards", args: [r, minOut, minOut], account });
         const hash = await wallet.writeContract(request);
         actions.push(`processRewards(${r}) ${hash}`);
+        processed++;
       }
     } catch {
-      actions.push(`processRewards(${r}) skipped`);
+      // already processed, or a transient error — leave it for the next tick.
     }
   }
 

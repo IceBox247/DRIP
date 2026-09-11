@@ -55,21 +55,25 @@ export function usePendingWinnings(enabled: boolean): Pending {
     const load = async () => {
       try {
         setState((s) => ({ ...s, loading: true }));
-        // Which rounds has this wallet deployed in? (bounded lookback, like the miners list)
+        // Which rounds has this wallet deployed in? Robinhood Chain blocks are ~0.1s, so a small block
+        // window covers only minutes — we scan a WIDE span (days) in CHUNKS the RPC will accept, so
+        // winnings stay visible until claimed, not just for the first hour.
         const latest = await client.getBlockNumber();
-        const span = BigInt(50000);
-        const from = latest > span ? latest - span : BigInt(0);
-        const logs = await client.getLogs({
-          address: gm.address,
-          event: deployedEvent,
-          args: { player: address },
-          fromBlock: from,
-          toBlock: latest,
-        });
+        const MAX_SPAN = BigInt(3_000_000); // ~3.5 days at 0.1s/block
+        const CHUNK = BigInt(450_000); // RPC-friendly getLogs range
+        const start = latest > MAX_SPAN ? latest - MAX_SPAN : BigInt(0);
         const roundSet = new Set<number>();
-        for (const l of logs) {
-          const r = (l.args as { round?: bigint }).round;
-          if (r !== undefined) roundSet.add(Number(r));
+        let lo = start;
+        while (lo <= latest) {
+          const hi = lo + CHUNK < latest ? lo + CHUNK : latest;
+          const logs = await client.getLogs({
+            address: gm.address, event: deployedEvent, args: { player: address }, fromBlock: lo, toBlock: hi,
+          });
+          for (const l of logs) {
+            const r = (l.args as { round?: bigint }).round;
+            if (r !== undefined) roundSet.add(Number(r));
+          }
+          lo = hi + BigInt(1);
         }
         const candidates = Array.from(roundSet).sort((a, b) => a - b);
 

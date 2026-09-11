@@ -9,6 +9,7 @@ import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contract
 import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
+import { useRoundHistory } from "@/lib/useRoundHistory";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -50,6 +51,8 @@ export default function MinePage() {
   // Unclaimed winnings across every settled round the wallet played (pre-harvest), so you can SEE and
   // harvest each round — not just the latest one.
   const pending = usePendingWinnings(live && isConnected);
+  const [showHistory, setShowHistory] = useState(false); // Last round → history modal
+  const history = useRoundHistory(live && showHistory, chain.round);
   const { writeContractAsync } = useWriteContract();
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
@@ -424,7 +427,11 @@ export default function MinePage() {
       {/* Last round + grid + Lite/Pro toggle (below the grid, ORE-style) */}
       {!result && (
         <>
-          <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs">
+          <button
+            type="button"
+            onClick={() => { if (live && roundShown > 1) setShowHistory(true); }}
+            disabled={live && roundShown <= 1}
+            className="mx-4 mt-4 flex w-[calc(100%-2rem)] items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs transition-colors enabled:hover:border-mute/50 disabled:cursor-default">
             <span className="uppercase tracking-wide text-mute">Last round</span>
             {live && roundShown <= 1 ? (
               <span className="text-mute">No rounds settled yet</span>
@@ -433,10 +440,10 @@ export default function MinePage() {
                 <span className="flex items-center gap-1"><Grid4 /> {live ? roundShown - 1 : last?.tile}</span>
                 {!live && <span className="font-medium text-white/90">{last?.winner}</span>}
                 {!live && <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">{last?.solo ? "Solo" : "Split"}</span>}
-                <span className="text-mute/70">›</span>
+                <span className="text-white/70">{live ? "History ›" : "›"}</span>
               </span>
             )}
-          </div>
+          </button>
 
           {mode === "pro" && (
             <div className="grid grid-cols-5 gap-1.5 px-4 pt-3">
@@ -680,6 +687,54 @@ export default function MinePage() {
           ? "On-chain · Robinhood Chain. A game of chance; not available where prohibited."
           : "Demo · fake funds, no chain. A game of chance; not available where prohibited."}
       </p>
+
+      {/* Last-round history — real settled rounds from the chain (winning tile, pot, your result). */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowHistory(false)}>
+          <div className="mx-auto max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-3xl border-t border-line bg-ink px-5 pb-8 pt-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Round history</h2>
+                <p className="text-sm text-mute">Real settled rounds on Robinhood Chain.</p>
+              </div>
+              <button onClick={() => setShowHistory(false)} className="text-mute hover:text-white" aria-label="Close">✕</button>
+            </div>
+
+            <div className="mt-5 space-y-2">
+              {history.loading && history.rows.length === 0 && (
+                <div className="py-8 text-center text-sm text-mute">Loading…</div>
+              )}
+              {!history.loading && history.rows.length === 0 && (
+                <div className="py-8 text-center text-sm text-mute">No settled rounds yet.</div>
+              )}
+              {history.rows.map((r) => (
+                <div key={r.round} className={`rounded-xl border p-3 ${r.youWon ? "border-lime/40 bg-lime/10" : "border-line bg-panel/60"}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      Round #{r.round}
+                      {r.youWon && <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink">YOU WON</span>}
+                      {r.motherlodeHit && <span className="rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-bold text-ink">🎰 MOTHERLODE</span>}
+                    </div>
+                    <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-ink">{r.hadWinner ? (r.soloMode ? "Solo" : "Split") : "No winner"}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-mute">
+                    <span className="flex items-center gap-1"><Grid4 /> tile {r.winningTile} won</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="flex items-center gap-1 text-mute">pool <span className="font-semibold text-white"><Usdg /> {fmt(r.totalIn, 2)}</span></span>
+                    <span className="flex items-center gap-1 text-mute">winners <span className="font-semibold text-white"><Usdg /> {fmt(r.winnerPotUsdg, 2)}</span></span>
+                    {r.rewardsProcessed
+                      ? <span className="flex items-center gap-1 text-mute"><Drip /> <span className="font-semibold text-white">{fmt(r.rewardDrip, 2)}</span></span>
+                      : <span className="text-yellow-500/80">rewards pending</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-center text-[11px] text-mute/60">Showing the most recent settled rounds.</p>
+          </div>
+        </div>
+      )}
 
       {/* Rewards / claim overlay (ORE-style: pick a %, see the refining fee, claim). */}
       {showRewards && (
