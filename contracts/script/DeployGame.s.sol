@@ -72,11 +72,21 @@ contract DeployGame is Script {
             }
         }
 
-        DripToken drip = new DripToken(cap, deployer); // fixed supply → deployer (== the Pons launch)
-        StakeVault stakeVault = new StakeVault(IERC20(address(drip)));
-        RefiningVault refining = new RefiningVault(IERC20(address(drip)), feeSink);
+        // DRIP token. Default: deploy our fixed-supply DripToken. If DRIP is given, use that existing
+        // token as DRIP (e.g. a real fixed-supply, burnable ERC20 already on-chain). It MUST have
+        // burn(uint256) — the reward engine burns 70% of bought DRIP each round.
+        address dripAddr = vm.envOr("DRIP", address(0));
+        bool externalDrip = dripAddr != address(0);
+        if (!externalDrip) {
+            dripAddr = address(new DripToken(cap, deployer)); // fixed supply → deployer (== the Pons launch)
+        } else {
+            console2.log("DripToken (existing):", dripAddr);
+        }
+        IERC20 drip = IERC20(dripAddr);
+        StakeVault stakeVault = new StakeVault(drip);
+        RefiningVault refining = new RefiningVault(drip, feeSink);
         GridMine gridMine = new GridMine(
-            IERC20(usdg), IERC20(address(drip)), IERC20(nvda), refining, stakeVault, ISwapRouter(swapRouter),
+            IERC20(usdg), drip, IERC20(nvda), refining, stakeVault, ISwapRouter(swapRouter),
             IRandomnessSource(randomness), marketing, deployer
         );
 
@@ -88,9 +98,21 @@ contract DeployGame is Script {
             console2.log("NOTE: set operator + fund bond + queue commitments on CommitRevealRandomness.");
         }
         // Seed the MOCK router with DRIP + NVDA so per-round buys have liquidity in testing. On mainnet
-        // the router is the real Pons/Uniswap-v4 pool — do NOT do this.
+        // the router is the real Pons/Uniswap-v4 pool — do NOT do this. SEED_DRIP = whole DRIP tokens
+        // to move from the deployer to the router (default 100k; for our own DripToken, cap/10).
         if (mockRouter) {
-            drip.transfer(swapRouter, cap / 10);
+            // Fixed swap rate for the mock. Default 1e16 bridges 6dp USDG → 18dp DRIP/NVDA at ~$1:1
+            // (out = in * 1e12), matching the tests. Override with SWAP_RATE_BPS if decimals differ.
+            MockSwapRouter(swapRouter).setRate(vm.envOr("SWAP_RATE_BPS", uint256(1e16)));
+            uint256 seedDrip = vm.envOr("SEED_DRIP", uint256(0)) * 1 ether;
+            if (seedDrip == 0) seedDrip = externalDrip ? 100_000 ether : cap / 10;
+            // Best-effort: the deployer must hold the DRIP to seed. If it doesn't (e.g. an existing
+            // token held by another wallet), this is skipped — send DRIP to the router manually.
+            try IERC20(dripAddr).transfer(swapRouter, seedDrip) returns (bool) {
+                console2.log("Seeded router with DRIP:", seedDrip);
+            } catch {
+                console2.log("SEED FAILED - send DRIP manually to the router:", swapRouter);
+            }
             // Mint mock NVDA liquidity to the router (real NVDA is a fixed on-chain token).
             try MockERC20(nvda).mint(swapRouter, 1_000_000 ether) {} catch {}
         }
