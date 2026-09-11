@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useReadContract } from "wagmi";
-import { formatUnits } from "viem";
+import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { formatUnits, parseUnits } from "viem";
 import { addresses, contractsReady } from "@/lib/contracts";
 
 // Faucet + live balances. Renders only when the game contracts are configured AND a wallet is
-// connected. The faucet is GASLESS: it POSTs to /api/faucet, where the keeper wallet pays the gas,
-// mints test USDG to the user, and drips a little testnet ETH so a zero-balance user can then play.
+// connected. Preferred path is GASLESS: it POSTs to /api/faucet, where the keeper wallet pays the
+// gas and mints test USDG. If the server faucet isn't configured (no KEEPER_PRIVATE_KEY in Vercel),
+// it falls back to minting the mock USDG straight from the connected wallet (which pays its own gas).
 
 const balAbi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
+] as const;
+
+const mintAbi = [
+  { type: "function", name: "mint", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
 ] as const;
 
 const fmt = (v: bigint | undefined, dec: number, show = 2) =>
@@ -18,6 +23,7 @@ const fmt = (v: bigint | undefined, dec: number, show = 2) =>
 
 export function Faucet() {
   const { address, isConnected } = useAccount();
+  const { writeContractAsync } = useWriteContract();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -39,21 +45,43 @@ export function Faucet() {
 
   if (!contractsReady || !isConnected || !address) return null;
 
+  // Mint 1,000 mock USDG straight from the connected wallet (it pays its own gas). Used as a
+  // fallback when the gasless server faucet isn't configured. The mock USDG has an open mint().
+  const mintSelf = async () => {
+    if (!addresses.usdg) throw new Error("USDG address not configured");
+    setMsg("Confirm mint in your wallet…");
+    await writeContractAsync({
+      address: addresses.usdg as `0x${string}`, abi: mintAbi, functionName: "mint",
+      args: [address as `0x${string}`, parseUnits("1000", 6)],
+    });
+    setMsg("Minted 1,000 USDG ✓");
+    setTimeout(() => { usdg.refetch(); drip.refetch(); }, 3000);
+  };
+
   const getUsdg = async () => {
     setBusy(true); setMsg(null);
+    // Try the gasless server faucet first; fall back to a direct wallet mint if it isn't available.
+    let useFallback = false;
     try {
       const r = await fetch("/api/faucet", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address }),
       });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "faucet failed");
-      setMsg(d.gas ? "Sent 1,000 USDG + gas ✓" : "Sent 1,000 USDG ✓");
-      setTimeout(() => { usdg.refetch(); drip.refetch(); }, 3000);
-    } catch (e) {
-      setMsg(String(e instanceof Error ? e.message : e).slice(0, 120));
-    } finally {
-      setBusy(false);
+      if (r.status === 503) {
+        useFallback = true; // server faucet not configured (no keeper wallet)
+      } else {
+        const d = await r.json();
+        if (!r.ok || !d.ok) throw new Error(d.error || "faucet failed");
+        setMsg(d.gas ? "Sent 1,000 USDG + gas ✓" : "Sent 1,000 USDG ✓");
+        setTimeout(() => { usdg.refetch(); drip.refetch(); }, 3000);
+      }
+    } catch {
+      useFallback = true; // network/other error reaching the server → mint from the wallet instead
     }
+    if (useFallback) {
+      try { await mintSelf(); }
+      catch (e) { setMsg(String(e instanceof Error ? e.message : e).slice(0, 120)); }
+    }
+    setBusy(false);
   };
 
   return (
@@ -74,7 +102,7 @@ export function Faucet() {
           {busy ? "Sending…" : "Get 1,000 test USDG"}
         </button>
       </div>
-      <div className="mt-2 text-[11px] text-mute">{msg ?? "Free test tokens + gas — no ETH needed, we cover it."}</div>
+      <div className="mt-2 text-[11px] text-mute">{msg ?? "Get 1,000 test USDG to play. Testnet only — no real value."}</div>
     </div>
   );
 }
