@@ -21,6 +21,9 @@ export const addresses = {
   gridMine: (process.env.NEXT_PUBLIC_GRIDMINE_ADDRESS ?? "") as `0x${string}` | "",
   refining: (process.env.NEXT_PUBLIC_REFINING_ADDRESS ?? "") as `0x${string}` | "",
   stake: (process.env.NEXT_PUBLIC_STAKE_ADDRESS ?? "") as `0x${string}` | "",
+  // MockRandomness (testnet only). If set, the "advance round" control seeds a fresh word so the
+  // winning tile varies. On mainnet the source is commit-reveal/VRF and this is unused.
+  randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS ?? "") as `0x${string}` | "",
 };
 
 /** True once the game contracts are deployed and their addresses are configured. */

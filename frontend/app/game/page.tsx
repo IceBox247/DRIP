@@ -66,29 +66,67 @@ export default function MinePage() {
   const timeShown = live ? chain.timeLeft : timeLeft;
   const motherlodeShown = live ? chain.motherlode : motherlode;
   const roundShown = live ? chain.round : round;
-  const canDeploy = !busy && amount > 0 && targets.length > 0 && (live ? selected.length === 1 : amount <= usdg);
+  const canDeploy = !busy && amount > 0 && targets.length > 0 && (live ? true : amount <= usdg);
 
   const toggle = (i: number) => {
     if (busy) return;
     setSelected((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i]));
   };
 
-  // Live on-chain deploy: approve USDG, then deploy to the single selected tile.
+  // Live on-chain deploy: split the amount across every selected tile, approve the total once, then
+  // deploy to each tile. You choose one tile or many — the amount is divided evenly between them.
   const doDeploy = async () => {
     if (!live) { deployNow(); return; }
-    if (selected.length !== 1) { setTxMsg("Pick exactly one tile to deploy on-chain."); return; }
-    const tile = selected[0];
+    if (targets.length === 0) { setTxMsg("Select at least one tile to deploy."); return; }
     try {
-      setTxMsg("Confirm approve in your wallet…");
-      const amt = parseUnits(String(amount), 6);
-      await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, amt] });
-      setTxMsg("Confirm deploy in your wallet…");
-      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deploy", args: [tile, amt] });
-      setTxMsg("Deployed on-chain ✓");
+      const total = parseUnits(String(amount), 6);
+      const n = BigInt(targets.length);
+      const per = total / n;
+      if (per === BigInt(0)) { setTxMsg("Amount too small to split across that many tiles."); return; }
+      const remainder = total - per * n; // dust from integer division → folded into the first tile
+      setTxMsg(`Confirm approve in your wallet…`);
+      await writeContractAsync({ address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve", args: [addresses.gridMine as `0x${string}`, per * n + remainder] });
+      for (let i = 0; i < targets.length; i++) {
+        const amt = i === 0 ? per + remainder : per;
+        setTxMsg(`Confirm deploy ${i + 1} of ${targets.length}…`);
+        await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deploy", args: [targets[i], amt] });
+      }
+      setTxMsg(`Deployed on-chain to ${targets.length} tile${targets.length > 1 ? "s" : ""} ✓`);
       setSelected([]);
       setTimeout(() => chain.refetch(), 3000);
     } catch (e) {
       setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
+    }
+  };
+
+  // Advance the on-chain round: (optionally) seed a fresh random word, close the expired round, and
+  // process rewards for the round that just settled. `closeRound`/`processRewards` are permissionless,
+  // so any connected wallet (with gas) can drive the game — this stands in for the server keeper while
+  // testing. On mainnet a keeper cron does this automatically every round.
+  const advanceRound = async () => {
+    if (!live) return;
+    const settling = chain.round; // the currently-open round that will settle on close
+    try {
+      if (addresses.randomness) {
+        try {
+          const bytes = new Uint8Array(32);
+          crypto.getRandomValues(bytes);
+          const word = BigInt("0x" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""));
+          const setWordAbi = [{ type: "function", name: "setWord", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] }] as const;
+          setTxMsg("Seeding randomness…");
+          await writeContractAsync({ address: addresses.randomness as `0x${string}`, abi: setWordAbi, functionName: "setWord", args: [word] });
+        } catch { /* non-fatal — closeRound still works with the last word */ }
+      }
+      setTxMsg("Closing round…");
+      await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "closeRound" });
+      try {
+        setTxMsg("Processing rewards…");
+        await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "processRewards", args: [BigInt(settling), BigInt(0), BigInt(0)] });
+      } catch { /* nothing to process (empty round) */ }
+      setTxMsg("New round started ✓");
+      setTimeout(() => chain.refetch(), 3000);
+    } catch (e) {
+      setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "advance failed");
     }
   };
 
@@ -215,6 +253,21 @@ export default function MinePage() {
 
       {/* Live testnet balance + faucet (only when a wallet is connected and contracts are configured) */}
       <Faucet />
+
+      {/* On-chain round control. When live and the round window has elapsed, the round is frozen until
+          someone calls closeRound() — this button does it (permissionless) so a fresh round starts.
+          On mainnet a keeper cron does this automatically; this is for testing without a keeper. */}
+      {live && timeShown === 0 && (
+        <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
+          <div className="text-sm font-semibold text-white">Round #{roundShown} ended</div>
+          <div className="mt-0.5 text-[11px] text-mute">
+            On-chain rounds don&rsquo;t auto-advance without a keeper. Tap to settle it and start a fresh 60s round.
+          </div>
+          <button onClick={advanceRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">
+            Start next round
+          </button>
+        </div>
+      )}
 
       {/* Reveal — "finding the winner" suspense after the countdown. */}
       {revealing && (
@@ -361,11 +414,9 @@ export default function MinePage() {
 
           <button disabled={!canDeploy} onClick={doDeploy}
             className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-            {live && selected.length !== 1
-              ? "Select one tile to deploy on-chain"
-              : mode === "pro" && selected.length === 0
-                ? "Select tiles to deploy"
-                : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}`}
+            {mode === "pro" && selected.length === 0
+              ? "Select tiles to deploy"
+              : `Deploy ${fmt(amount, amount % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${targets.length} tiles` : ""}`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
             <span>{live ? "On-chain · testnet" : `Wallet ${fmt(usdg)} USDG`}</span>
