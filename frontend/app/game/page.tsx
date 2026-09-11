@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { parseUnits, maxUint256 } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
@@ -58,6 +58,7 @@ export default function MinePage() {
   const [showHistory, setShowHistory] = useState(false); // Last round → history modal
   const history = useRoundHistory(live && showHistory, chain.round);
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
     address: (addresses.usdg || undefined) as `0x${string}` | undefined,
@@ -138,9 +139,11 @@ export default function MinePage() {
   };
 
   // Live on-chain deploy: the amount is PER TILE (like ORE) — each selected tile gets `amount`, so
-  // the total spent is amount × tiles. One transaction (deployMany). USDG is approved ONCE (max), then
-  // deploys are a single signature per round. An explicit gas limit is passed because the wallet can
-  // mis-estimate deployMany while the approve is still pending (the "intrinsic gas too low" error).
+  // the total spent is amount × tiles. One transaction (deployMany). USDG is approved ONCE (max), and
+  // we WAIT for that approval to confirm before deploying, so the wallet can estimate deployMany's real
+  // gas (it can't while the approve is pending — transferFrom would revert). We deliberately do NOT
+  // force a big gas limit: wallets reserve gasLimit×maxFee up front, so a hardcoded 4M limit makes a
+  // low-ETH wallet reject the tx ("insufficient ETH") even though the real fee is tiny.
   const doDeploy = async () => {
     if (!live) { deployNow(); return; }
     if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return; }
@@ -152,20 +155,24 @@ export default function MinePage() {
       const total = perTile * n; // total USDG spent = per-tile × number of tiles
       const tilesArg = targets.map((t) => t); // uint8[]
       const amountsArg = targets.map(() => perTile); // uint256[] — same amount on each tile
-      // Approve once (max) only if the current allowance can't cover this deploy.
+      // Approve once (max) only if the current allowance can't cover this deploy, then wait for it to
+      // be mined so the deploy's gas estimate succeeds.
       const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
       if (cur < total) {
         setTxMsg("Approve USDG (one time)…");
-        await writeContractAsync({
+        const approveHash = await writeContractAsync({
           address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
-          args: [addresses.gridMine as `0x${string}`, maxUint256], gas: BigInt(120000),
+          args: [addresses.gridMine as `0x${string}`, maxUint256],
         });
+        setTxMsg("Waiting for approval to confirm…");
+        if (publicClient) await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        await allowance.refetch();
       }
       setTxMsg(`Deploying to ${targets.length} tile${targets.length > 1 ? "s" : ""}…`);
       await writeContractAsync({
         address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany",
         args: [tilesArg, amountsArg],
-        gas: BigInt(500000) + BigInt(140000) * n, // generous fixed limit so the wallet can't under-set it
+        // No forced gas limit — the wallet estimates the real (small) fee, so low-ETH wallets work.
       });
       setTxMsg(`Deployed on-chain to ${targets.length} tile${targets.length > 1 ? "s" : ""} ✓`);
       setSelected([]);
