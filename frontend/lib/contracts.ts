@@ -26,9 +26,11 @@ const MAINNET = {
   refining: "0x93D0b1F57075403bfD289A58850a8331a3a281Ee",
   stake: "0x6CE30eFA833D207ce8f82797dA1E706b1739Ec11",
   randomness: "0x97ba2e34574fAe6B7bD7420a1dB1875CEc937Ae5",
-  // PonsSwapAdapter (GridMine.router()) — public swapExactIn routes USDG→DRIP via the Pons curve so
-  // players can buy DRIP in-app. Selling is not routed (the bonding curve is buy-only pre-graduation).
+  // PonsSwapAdapter (GridMine.router()) — routes the game's reward buys.
   adapter: "0xc03f52E5b83bA89863Afc3343d506E3224aDA3a9",
+  // DRIP's Pons bonding curve — supports BOTH buy (USDG→DRIP) and sell (DRIP→USDG) until it graduates
+  // to a pool. The Trade page uses it directly so players can buy AND sell in-app.
+  curve: "0xa077C42F1f61e6E8F6BAef4B7B1e7e2F5D3eDf86",
 } as const;
 
 export const addresses = {
@@ -40,6 +42,7 @@ export const addresses = {
   stake: (process.env.NEXT_PUBLIC_STAKE_ADDRESS || MAINNET.stake) as `0x${string}` | "",
   randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS || MAINNET.randomness) as `0x${string}` | "",
   adapter: (process.env.NEXT_PUBLIC_ADAPTER_ADDRESS || MAINNET.adapter) as `0x${string}` | "",
+  curve: (process.env.NEXT_PUBLIC_CURVE_ADDRESS || MAINNET.curve) as `0x${string}` | "",
 };
 
 // PonsSwapAdapter: swapExactIn(tokenIn, tokenOut, amountIn, minOut) → amountOut (sent to caller).
@@ -52,6 +55,17 @@ export const swapAdapterAbi = [
     ],
     outputs: [{ type: "uint256" }],
   },
+] as const;
+
+// Pons bonding curve — buy (USDG→DRIP) and sell (DRIP→USDG), plus reserves for live quotes.
+//   buy(quoteIn, minTokensOut, recipient)  → tokensOut  (approve USDG to the curve first)
+//   sell(tokensIn, minQuoteOut, recipient) → quoteOut   (approve DRIP to the curve first)
+export const ponsCurveAbi = [
+  { type: "function", name: "buy", stateMutability: "payable", inputs: [{ name: "quoteIn", type: "uint256" }, { name: "minTokensOut", type: "uint256" }, { name: "recipient", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "sell", stateMutability: "nonpayable", inputs: [{ name: "tokensIn", type: "uint256" }, { name: "minQuoteOut", type: "uint256" }, { name: "recipient", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "tokenReserve", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "quoteReserve", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "graduated", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
 ] as const;
 
 /** True once the game contracts are deployed and their addresses are configured. */
