@@ -7,6 +7,7 @@ import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
 import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
 import { useLiveRound } from "@/lib/useLiveRound";
+import { useLiveMiners } from "@/lib/useLiveMiners";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -23,6 +24,7 @@ const seedOthers = (): number[] =>
   Array.from({ length: N }, () => (Math.random() < 0.7 ? Math.round((8 + Math.random() * 60) * 100) / 100 : 0));
 const seeded = (): Tile[] => { const o = seedOthers(); return Array.from({ length: N }, (_, i) => ({ mine: 0, others: o[i] })); };
 const fmt = (n: number, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`; // 0x1234…abcd
 
 const MINERS = [
   { a: "55nF…mqjh", t: 25, v: 0.63 }, { a: "7ibJ…PU4B", t: 15, v: 0.6 }, { a: "7chh…wC4f", t: 25, v: 0.59 },
@@ -37,6 +39,7 @@ export default function MinePage() {
   // contracts aren't configured or the chain isn't reachable.
   const chain = useLiveRound(contractsReady);
   const live = contractsReady && chain.ready; // showing real chain data (connected or not)
+  const liveMiners = useLiveMiners(chain.round, live); // real participants in the current round
   const { writeContractAsync } = useWriteContract();
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
@@ -438,22 +441,41 @@ export default function MinePage() {
         <div className="mt-2 text-center text-[11px] text-mute">Refining taxes 10% to holders who haven&rsquo;t claimed — hold longer, earn more.</div>
       </div>
 
-      {/* Miners */}
+      {/* Miners — real on-chain participants when live; demo sample only in practice mode. */}
       <div className="mx-4 mt-4">
         <div className="mb-2 text-xs uppercase tracking-wide text-mute">Miners</div>
         <div className="divide-y divide-line/60 rounded-2xl border border-line bg-panel">
-          {MINERS.map((m) => (
-            <div key={m.a} className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span className="flex items-center gap-2">
-                <span className="h-6 w-6 rounded-full bg-panel2" />
-                <span className="text-white">{m.a}</span>
-              </span>
-              <span className="flex items-center gap-3 text-mute">
-                <span className="flex items-center gap-1 text-xs"><Grid4 /> {m.t}</span>
-                <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(m.v, 2)}</span>
-              </span>
-            </div>
-          ))}
+          {live ? (
+            liveMiners.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-mute">No miners yet this round — be the first to deploy.</div>
+            ) : (
+              liveMiners.map((m) => (
+                <div key={m.addr} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <span className="flex items-center gap-2">
+                    <span className="h-6 w-6 rounded-full bg-panel2" />
+                    <span className="text-white">{short(m.addr)}</span>
+                  </span>
+                  <span className="flex items-center gap-3 text-mute">
+                    <span className="flex items-center gap-1 text-xs"><Grid4 /> {m.tiles}</span>
+                    <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(m.total, 2)}</span>
+                  </span>
+                </div>
+              ))
+            )
+          ) : (
+            MINERS.map((m) => (
+              <div key={m.a} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="h-6 w-6 rounded-full bg-panel2" />
+                  <span className="text-white">{m.a}</span>
+                </span>
+                <span className="flex items-center gap-3 text-mute">
+                  <span className="flex items-center gap-1 text-xs"><Grid4 /> {m.t}</span>
+                  <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(m.v, 2)}</span>
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
