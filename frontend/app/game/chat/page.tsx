@@ -4,39 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import { AppChrome } from "@/components/AppChrome";
 
-// Chat — ORE-style live miner chat. Persists to Neon when DATABASE_URL is set (else a demo
-// simulation). Each browser gets its own guest handle (stored locally) until a wallet is connected,
-// so different people show as different senders — not all as "you".
+// Chat — ORE-style live miner chat. REAL messages persisted to Neon Postgres via /api/chat when
+// DATABASE_URL is set. No demo chatter: until a database is connected the feed shows an offline
+// notice rather than fabricated conversation. Each browser gets its own guest handle (stored locally)
+// until a wallet is connected, so different people show as different senders — not all as "you".
 
 type Msg = { id: number; name: string; hue: number; text: string; ts: number; system?: boolean };
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 const now = () => Date.now();
-const HANDLES = ["55nF…mqjh", "7ibJ…PU4B", "NotZohran", "7chh…wC4f", "gridwhale", "5c4R…VHcq", "dripmaxi", "H8VM…66bA"];
-const CHATTER = [
-  "all in on tile 7 lol",
-  "motherlode is at 26 DRIP 👀",
-  "who just solo'd that round",
-  "spreading across all 25, win small win often",
-  "gm miners",
-  "refined 4 DRIP, tax hurt but wagmi",
-  "that was a fat loser pot",
-  "burn ratio is insane, 70% every round",
-  "stacking one tile from here on",
-  "someone hit the 1/625??",
-  "USDG pot always pro-rata, love it",
-  "staking apr looking healthy",
-];
 const hueFor = (name: string) => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 const initials = (name: string) => name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "??";
-
-const SEED: Msg[] = [
-  { id: 1, name: "system", hue: 0, text: "Welcome to Grid Mine chat — demo build. Be nice, no shilling.", ts: now() - 1000 * 60 * 14, system: true },
-  { id: 2, name: "gridwhale", hue: hueFor("gridwhale"), text: "gm, who's mining the early rounds", ts: now() - 1000 * 60 * 12 },
-  { id: 3, name: "NotZohran", hue: hueFor("NotZohran"), text: "spread strat > stack strat, fight me", ts: now() - 1000 * 60 * 9 },
-  { id: 4, name: "dripmaxi", hue: hueFor("dripmaxi"), text: "just solo'd the DRIP pot 🏆 all 0.63 mine", ts: now() - 1000 * 60 * 6 },
-  { id: 5, name: "7ibJ…PU4B", hue: hueFor("7ibJ…PU4B"), text: "motherlode climbing, 1/625 gonna print for someone", ts: now() - 1000 * 60 * 3 },
-];
 
 const clock = (ts: number) => {
   const diff = (now() - ts) / 1000;
@@ -50,9 +28,8 @@ const rowToMsg = (r: Row): Msg => ({ id: r.id, name: r.name, hue: r.hue, text: r
 
 export default function ChatPage() {
   const { address } = useAccount();
-  const [msgs, setMsgs] = useState<Msg[]>(SEED);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
-  const [online] = useState(() => 40 + Math.floor(Math.random() * 80));
   const [live, setLive] = useState(false); // true once the Neon-backed API answers
   // Per-browser guest identity (persists across reloads). A connected wallet overrides it.
   const [guest] = useState(() => {
@@ -64,9 +41,10 @@ export default function ChatPage() {
     } catch { return `guest-${Math.random().toString(16).slice(2, 6)}`; }
   });
   const myName = address ? short(address) : guest;
-  const nextId = useRef(SEED.length + 1);
+  const nextId = useRef(-1); // negative temp ids for optimistic local messages (server ids are positive)
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const online = new Set(msgs.filter((m) => !m.system).map((m) => m.name)).size; // real: distinct chatters in view
 
   // Keep the feed pinned to the latest message.
   useEffect(() => {
@@ -87,28 +65,17 @@ export default function ChatPage() {
     return () => { alive = false; };
   }, []);
 
-  // Live mode: poll the API for new messages. Demo mode: simulate chatter locally.
+  // Live mode: poll the API for new messages. When there's no database, we DON'T simulate fake chatter
+  // — the feed just stays as-is (the offline notice is shown below the composer).
   useEffect(() => {
-    if (live) {
-      const id = setInterval(() => {
-        fetch("/api/chat")
-          .then((r) => r.json())
-          .then((d) => { if (d?.enabled && Array.isArray(d.messages)) setMsgs(d.messages.map(rowToMsg)); })
-          .catch(() => {});
-      }, 5000);
-      return () => clearInterval(id);
-    }
-    const timer = { current: undefined as ReturnType<typeof setTimeout> | undefined };
-    const schedule = () => {
-      timer.current = setTimeout(() => {
-        const name = HANDLES[Math.floor(Math.random() * HANDLES.length)];
-        const text = CHATTER[Math.floor(Math.random() * CHATTER.length)];
-        setMsgs((m) => [...m, { id: nextId.current++, name, hue: hueFor(name), text, ts: now() }].slice(-60));
-        schedule();
-      }, 5000 + Math.random() * 9000);
-    };
-    schedule();
-    return () => timer.current && clearTimeout(timer.current);
+    if (!live) return;
+    const id = setInterval(() => {
+      fetch("/api/chat")
+        .then((r) => r.json())
+        .then((d) => { if (d?.enabled && Array.isArray(d.messages)) setMsgs(d.messages.map(rowToMsg)); })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
   }, [live]);
 
   const send = () => {
@@ -137,7 +104,8 @@ export default function ChatPage() {
           <div>
             <h1 className="text-xl font-semibold text-white">Chat</h1>
             <div className="flex items-center gap-1.5 text-xs text-mute">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime" /> {online} miners online
+              <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-lime" : "bg-mute"}`} />
+              {live ? `${online} chatting` : "offline"}
             </div>
           </div>
           <span className="rounded-full border border-line bg-panel px-3 py-1 text-[11px] text-mute">Global</span>
@@ -145,6 +113,13 @@ export default function ChatPage() {
 
         {/* Feed */}
         <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          {msgs.length === 0 && (
+            <div className="mx-auto mt-10 max-w-xs rounded-2xl border border-line bg-panel p-5 text-center text-sm text-mute">
+              {live
+                ? "No messages yet — say gm to the grid 👋"
+                : "Chat is offline. It turns on automatically once a database is connected (set DATABASE_URL in Vercel — a free Neon Postgres works)."}
+            </div>
+          )}
           {msgs.map((m) => {
             const mine = m.name === myName;
             return m.system ? (
@@ -200,7 +175,7 @@ export default function ChatPage() {
           <p className="mt-2 text-center text-[11px] text-mute/60">
             {live
               ? `Posting as ${myName}${address ? " (wallet)" : " · connect a wallet for your address"} · saved`
-              : "Demo chat (not saved). Set DATABASE_URL in Vercel to go live."}
+              : "Chat is offline until a database is connected (DATABASE_URL). Messages you type now aren't saved or shared."}
           </p>
         </div>
       </div>
