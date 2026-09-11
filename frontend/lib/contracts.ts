@@ -2,7 +2,9 @@ import { defineChain } from "viem";
 
 // Robinhood Chain (Arbitrum Orbit L2). Mainnet 4663 / testnet 46630. The RPC the keeper/reads use is
 // env-driven, so the same code targets either network.
-const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 4663);
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 4663);
+/** Testnet (46630) has mintable mock tokens + a faucet; mainnet (4663) uses real tokens. */
+export const isTestnet = CHAIN_ID === 46630;
 const RPC = process.env.RPC_URL || process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.mainnet.chain.robinhood.com";
 
 export const robinhoodChain = defineChain({

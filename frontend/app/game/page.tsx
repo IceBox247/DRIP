@@ -479,7 +479,9 @@ export default function MinePage() {
       </div>
 
       <p className="px-4 py-6 text-center text-[11px] text-mute/60">
-        Demo · fake funds, no chain. A game of chance; not available where prohibited.
+        {live
+          ? "On-chain · Robinhood Chain. A game of chance; not available where prohibited."
+          : "Demo · fake funds, no chain. A game of chance; not available where prohibited."}
       </p>
 
       {/* Rewards / claim overlay (ORE-style: pick a %, see the refining fee, claim). */}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
-import { addresses, contractsReady } from "@/lib/contracts";
+import { addresses, contractsReady, isTestnet } from "@/lib/contracts";
 
 // Faucet + live balances. Renders only when the game contracts are configured AND a wallet is
 // connected. Preferred path is GASLESS: it POSTs to /api/faucet, where the keeper wallet pays the
@@ -88,21 +88,26 @@ export function Faucet() {
     <div className="mx-4 mt-4 rounded-2xl border border-lime/30 bg-lime/5 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wide text-mute">Your testnet balance</div>
+          <div className="text-xs uppercase tracking-wide text-mute">{isTestnet ? "Your testnet balance" : "Your balance"}</div>
           <div className="mt-0.5 text-sm font-semibold text-white">
             {fmt(usdg.data as bigint | undefined, 6)} USDG · {fmt(drip.data as bigint | undefined, 18, 4)} DRIP
             {addresses.nvda ? ` · ${fmt(nvda.data as bigint | undefined, 18, 4)} NVDA` : ""}
           </div>
         </div>
-        <button
-          onClick={getUsdg}
-          disabled={busy}
-          className="shrink-0 rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-ink disabled:opacity-60"
-        >
-          {busy ? "Sending…" : "Get 1,000 test USDG"}
-        </button>
+        {/* The faucet mints mock USDG — testnet only. On mainnet, real USDG is funded by the user. */}
+        {isTestnet && (
+          <button
+            onClick={getUsdg}
+            disabled={busy}
+            className="shrink-0 rounded-lg bg-lime px-3 py-2 text-xs font-semibold text-ink disabled:opacity-60"
+          >
+            {busy ? "Sending…" : "Get 1,000 test USDG"}
+          </button>
+        )}
       </div>
-      <div className="mt-2 text-[11px] text-mute">{msg ?? "Get 1,000 test USDG to play. Testnet only — no real value."}</div>
+      <div className="mt-2 text-[11px] text-mute">
+        {msg ?? (isTestnet ? "Get 1,000 test USDG to play. Testnet only — no real value." : "Fund this wallet with USDG on Robinhood Chain to play.")}
+      </div>
     </div>
   );
 }
