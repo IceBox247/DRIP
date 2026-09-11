@@ -14,11 +14,12 @@ import { gridMine } from "@/lib/site";
 type Tile = { mine: number; others: number };
 const N = gridMine.tiles;
 const START_USDG = 1000;
-// A round starts EMPTY and idle — no stake, timer paused — until the first miner deploys. When you
-// enter, other miners "join" (seeded here) and the countdown begins.
+// A round is always live (ORE-style): the grid is populated with other miners and the timer runs.
+// `empty` is the SSR-safe first paint (deterministic); `seeded` fills the grid on the client.
 const empty = (): Tile[] => Array.from({ length: N }, () => ({ mine: 0, others: 0 }));
 const seedOthers = (): number[] =>
   Array.from({ length: N }, () => (Math.random() < 0.7 ? Math.round((8 + Math.random() * 60) * 100) / 100 : 0));
+const seeded = (): Tile[] => { const o = seedOthers(); return Array.from({ length: N }, (_, i) => ({ mine: 0, others: o[i] })); };
 const fmt = (n: number, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 
 const MINERS = [
@@ -32,18 +33,16 @@ export default function MinePage() {
   const live = isConnected && contractsReady; // wallet connected + testnet contracts configured
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
-  const [started, setStarted] = useState(false); // timer runs only after the first miner enters
   const [selected, setSelected] = useState<number[]>([]);
   const [amount, setAmount] = useState(10);
   const [usdg, setUsdg] = useState(START_USDG);
-  const [unrefined, setUnrefined] = useState(0);
-  const [claimed, setClaimed] = useState(0);
-  const [nvda, setNvda] = useState(0); // tokenized NVIDIA won (4% refining slice, 1-or-all)
+  const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet claimed
+  const [claimed, setClaimed] = useState(0); // refined DRIP, in wallet
   const [motherlode, setMotherlode] = useState(26);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [round, setRound] = useState(397203);
   const [last, setLast] = useState<{ tile: number; solo: boolean; winner: string } | null>({ tile: 13, solo: false, winner: "KingAmadán" });
-  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; nvda: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
+  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
   const [revealing, setRevealing] = useState(false); // "finding the winner" animation phase
   const [revealTile, setRevealTile] = useState<number | null>(null);
   const [sparkles] = useState<boolean[]>(() => Array.from({ length: N }, () => Math.random() < 0.4));
@@ -63,16 +62,9 @@ export default function MinePage() {
     const admin = (amount * gridMine.adminFeeBps) / 10000;
     const per = Math.round(((amount - admin) / targets.length) * 1e4) / 1e4;
     setUsdg((u) => Math.round((u - amount) * 100) / 100);
-    // First deploy of the round: other miners join and the timer starts.
-    const others = started ? null : seedOthers();
-    setTiles((ts) => ts.map((t, j) => ({
-      ...t,
-      others: others ? t.others + others[j] : t.others,
-      mine: targets.includes(j) ? t.mine + per : t.mine,
-    })));
-    if (!started) setStarted(true);
+    setTiles((ts) => ts.map((t, j) => (targets.includes(j) ? { ...t, mine: t.mine + per } : t)));
     setSelected([]);
-  }, [amount, targets, canDeploy, started]);
+  }, [amount, targets, canDeploy]);
 
   // Pure: compute the round outcome (winning tile + payouts) without touching state.
   const computeOutcome = useCallback(() => {
@@ -81,33 +73,31 @@ export default function MinePage() {
     const winnerStake = tiles[tile].mine + tiles[tile].others;
     const mine = tiles[tile].mine;
     const loserStake = gross - winnerStake;
-    let usdgDelta = 0, drip = 0, nvda = 0, solo = false, soloYou = false, motherlodeHit = false, newMotherlode = motherlode;
+    let usdgDelta = 0, drip = 0, solo = false, soloYou = false, motherlodeHit = false, newMotherlode = motherlode;
     if (winnerStake > 0) {
       const cut = (loserStake * gridMine.loserCutBps) / 10000;
       const winnerPot = loserStake - cut;
       if (mine > 0) usdgDelta = mine + (winnerPot * mine) / winnerStake;
       const winnersDrip = (cut * gridMine.cutSplitWinnersBps) / 10000;
       const motherAdd = (cut * gridMine.cutSplitMotherlodeBps) / 10000;
-      const nvdaPool = ((cut * gridMine.cutSplitWinnersNvdaBps) / 10000) / gridMine.nvdaPrice;
       let payoutPool = winnersDrip;
       const next = motherlode + motherAdd;
       if (Math.random() * gridMine.motherlodeOdds < 1) { motherlodeHit = true; payoutPool += next; newMotherlode = 0; }
       else newMotherlode = Math.round(next * 100) / 100;
       solo = Math.random() < 1 / gridMine.soloOdds;
       if (mine > 0) {
-        if (solo) { soloYou = Math.random() < mine / winnerStake; drip = soloYou ? payoutPool : 0; nvda = soloYou ? nvdaPool : 0; }
-        else { drip = (payoutPool * mine) / winnerStake; nvda = (nvdaPool * mine) / winnerStake; }
+        if (solo) { soloYou = Math.random() < mine / winnerStake; drip = soloYou ? payoutPool : 0; }
+        else drip = (payoutPool * mine) / winnerStake;
       }
     }
-    return { tile, usdgDelta, drip, nvda, solo, soloYou, motherlodeHit, newMotherlode };
+    return { tile, usdgDelta, drip, solo, soloYou, motherlodeHit, newMotherlode };
   }, [tiles, motherlode]);
 
   const applyOutcome = useCallback((o: ReturnType<typeof computeOutcome>) => {
     setMotherlode(o.newMotherlode);
     if (o.usdgDelta > 0) setUsdg((u) => Math.round((u + o.usdgDelta) * 100) / 100);
     if (o.drip > 0) setUnrefined((d) => Math.round((d + o.drip) * 1e6) / 1e6);
-    if (o.nvda > 0) setNvda((n) => Math.round((n + o.nvda) * 1e6) / 1e6);
-    setResult({ tile: o.tile, won: o.usdgDelta > 0, usdgDelta: o.usdgDelta, drip: o.drip, nvda: o.nvda, solo: o.solo, soloYou: o.soloYou, motherlodeHit: o.motherlodeHit });
+    setResult({ tile: o.tile, won: o.usdgDelta > 0, usdgDelta: o.usdgDelta, drip: o.drip, solo: o.solo, soloYou: o.soloYou, motherlodeHit: o.motherlodeHit });
     setLast({ tile: o.tile, solo: o.solo, winner: o.soloYou ? "You" : MINERS[Math.floor(Math.random() * MINERS.length)].a });
   }, []);
 
@@ -129,10 +119,9 @@ export default function MinePage() {
 
   const nextRound = useCallback(() => {
     setRound((r) => r + 1);
-    setTiles(empty());
+    setTiles(seeded());
     setResult(null);
     setSelected([]);
-    setStarted(false);
     setTimeLeft(gridMine.roundSeconds);
   }, []);
 
@@ -142,13 +131,16 @@ export default function MinePage() {
     setUnrefined(0);
   };
 
-  // Countdown — only runs once a miner has entered (started). At zero, run the reveal animation.
+  // Populate the grid on the client (avoids an SSR/client hydration mismatch from Math.random).
+  useEffect(() => { setTiles(seeded()); }, []);
+
+  // Countdown — always running (ORE-style). At zero, run the reveal animation.
   useEffect(() => {
-    if (busy || !started) return;
+    if (busy) return;
     if (timeLeft <= 0) { startReveal(); return; }
     const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearTimeout(id);
-  }, [timeLeft, busy, started, startReveal]);
+  }, [timeLeft, busy, startReveal]);
 
   // Auto-advance to the next round a few seconds after settlement.
   useEffect(() => {
@@ -166,19 +158,11 @@ export default function MinePage() {
       <div className="grid grid-cols-3 px-4 py-6 text-center">
         <Stat label="DEPLOYED" value={fmt(pool)} accent />
         <Stat label="MOTHERLODE" value={fmt(motherlode, 0)} gold border />
-        <Stat label="TIME" value={result ? "00:00" : revealing ? "···" : !started ? "--:--" : `${mm}:${ss}`} danger={started && !busy && timeLeft <= 10} />
+        <Stat label="TIME" value={result ? "00:00" : revealing ? "···" : `${mm}:${ss}`} danger={!busy && timeLeft <= 10} />
       </div>
 
       {/* Live testnet balance + faucet (only when a wallet is connected and contracts are configured) */}
       <Faucet />
-
-      {/* Waiting state — the round is idle until the first miner deploys. */}
-      {!started && !result && (
-        <div className="mx-4 mb-1 flex items-center justify-center gap-2 rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs text-mute">
-          <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulseDot" />
-          Waiting for the first miner — the timer starts when someone deploys.
-        </div>
-      )}
 
       {/* Reveal — "finding the winner" suspense after the countdown. */}
       {revealing && (
@@ -197,9 +181,9 @@ export default function MinePage() {
                 {`+${fmt(result.usdgDelta)} USDG`}
                 {result.solo
                   ? result.soloYou
-                    ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP + ${fmt(result.nvda, 4)} NVDA 🏆`
-                    : " · solo round (DRIP + NVDA went to one winner)"
-                  : ` · +${fmt(result.drip, 3)} DRIP · +${fmt(result.nvda, 4)} NVDA`}
+                    ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP 🏆`
+                    : " · solo round (DRIP went to one winner)"
+                  : ` · +${fmt(result.drip, 3)} DRIP`}
               </>
             ) : (
               "You had no stake on the winning tile."
@@ -331,24 +315,23 @@ export default function MinePage() {
 
       {/* Winnings */}
       <div className="mx-4 mt-6 rounded-2xl border border-line bg-panel p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-mute">Unrefined DRIP</div>
-            <div className="mt-0.5 text-xl font-semibold text-white">{fmt(unrefined, 4)}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-line bg-ink/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-mute">Unrefined DRIP</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(unrefined, 4)}</div>
+            <div className="mt-0.5 text-[11px] text-mute">won — refine to claim</div>
           </div>
-          <button onClick={claim} disabled={unrefined <= 0}
-            className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
-            Claim (−10%)
-          </button>
-        </div>
-        <div className="mt-1 text-xs text-mute">In wallet: {fmt(claimed, 4)} DRIP · claiming taxes 10% to unclaimed holders</div>
-        <div className="mt-3 flex items-center justify-between border-t border-line/50 pt-3">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-mute">NVDA won</div>
-            <div className="mt-0.5 text-xl font-semibold text-white">{fmt(nvda, 4)}</div>
+          <div className="rounded-xl border border-line bg-ink/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-mute">Refined DRIP</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(claimed, 4)}</div>
+            <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
           </div>
-          <span className="rounded-full border border-line bg-panel2 px-3 py-1 text-[11px] text-mute">4% of the cut · tokenized NVIDIA</span>
         </div>
+        <button onClick={claim} disabled={unrefined <= 0}
+          className="mt-3 w-full rounded-xl bg-lime py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
+          {unrefined > 0 ? `Refine ${fmt(unrefined, 4)} DRIP → wallet (−10%)` : "Nothing to refine yet"}
+        </button>
+        <div className="mt-2 text-center text-[11px] text-mute">Refining taxes 10% to holders who haven&rsquo;t claimed — hold longer, earn more.</div>
       </div>
 
       {/* Miners */}
