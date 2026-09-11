@@ -45,13 +45,14 @@ export default function MinePage() {
   const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet refined
   const [claimed, setClaimed] = useState(0); // refined DRIP, in wallet
   const [usdgWon, setUsdgWon] = useState(0); // USDG winnings, claimable (like ORE's SOL)
+  const [nvdaWon, setNvdaWon] = useState(0); // NVDA won this round(s) — the 4% winners' slice
   const [showRewards, setShowRewards] = useState(false); // rewards/claim overlay
   const [claimPct, setClaimPct] = useState(100);
   const [motherlode, setMotherlode] = useState(26);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [round, setRound] = useState(397203);
   const [last, setLast] = useState<{ tile: number; solo: boolean; winner: string } | null>({ tile: 13, solo: false, winner: "KingAmadán" });
-  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
+  const [result, setResult] = useState<null | { tile: number; won: boolean; usdgDelta: number; drip: number; nvda: number; solo: boolean; soloYou: boolean; motherlodeHit: boolean }>(null);
   const [revealing, setRevealing] = useState(false); // "finding the winner" animation phase
   const [revealTile, setRevealTile] = useState<number | null>(null);
   const [sparkles] = useState<boolean[]>(() => Array.from({ length: N }, () => Math.random() < 0.4));
@@ -107,12 +108,14 @@ export default function MinePage() {
     const winnerStake = tiles[tile].mine + tiles[tile].others;
     const mine = tiles[tile].mine;
     const loserStake = gross - winnerStake;
-    let usdgDelta = 0, drip = 0, solo = false, soloYou = false, motherlodeHit = false, newMotherlode = motherlode;
+    let usdgDelta = 0, drip = 0, nvda = 0, solo = false, soloYou = false, motherlodeHit = false, newMotherlode = motherlode;
     if (winnerStake > 0) {
       const cut = (loserStake * gridMine.loserCutBps) / 10000;
       const winnerPot = loserStake - cut;
       if (mine > 0) usdgDelta = mine + (winnerPot * mine) / winnerStake;
       const winnersDrip = (cut * gridMine.cutSplitWinnersBps) / 10000;
+      // 4% of the cut buys NVDA for the winners (USDG value → NVDA units at the demo price).
+      const nvdaPool = (cut * gridMine.cutSplitWinnersNvdaBps) / 10000 / gridMine.nvdaPrice;
       const motherAdd = (cut * gridMine.cutSplitMotherlodeBps) / 10000;
       let payoutPool = winnersDrip;
       const next = motherlode + motherAdd;
@@ -120,11 +123,17 @@ export default function MinePage() {
       else newMotherlode = Math.round(next * 100) / 100;
       solo = Math.random() < 1 / gridMine.soloOdds;
       if (mine > 0) {
-        if (solo) { soloYou = Math.random() < mine / winnerStake; drip = soloYou ? payoutPool : 0; }
-        else drip = (payoutPool * mine) / winnerStake;
+        if (solo) {
+          soloYou = Math.random() < mine / winnerStake;
+          drip = soloYou ? payoutPool : 0;
+          nvda = soloYou ? nvdaPool : 0;
+        } else {
+          drip = (payoutPool * mine) / winnerStake;
+          nvda = (nvdaPool * mine) / winnerStake;
+        }
       }
     }
-    return { tile, usdgDelta, drip, solo, soloYou, motherlodeHit, newMotherlode };
+    return { tile, usdgDelta, drip, nvda, solo, soloYou, motherlodeHit, newMotherlode };
   }, [tiles, motherlode]);
 
   const applyOutcome = useCallback((o: ReturnType<typeof computeOutcome>) => {
@@ -132,7 +141,8 @@ export default function MinePage() {
     // USDG winnings accrue as a claimable balance (like ORE's SOL) instead of auto-crediting.
     if (o.usdgDelta > 0) setUsdgWon((w) => Math.round((w + o.usdgDelta) * 100) / 100);
     if (o.drip > 0) setUnrefined((d) => Math.round((d + o.drip) * 1e6) / 1e6);
-    setResult({ tile: o.tile, won: o.usdgDelta > 0, usdgDelta: o.usdgDelta, drip: o.drip, solo: o.solo, soloYou: o.soloYou, motherlodeHit: o.motherlodeHit });
+    if (o.nvda > 0) setNvdaWon((n) => Math.round((n + o.nvda) * 1e6) / 1e6);
+    setResult({ tile: o.tile, won: o.usdgDelta > 0, usdgDelta: o.usdgDelta, drip: o.drip, nvda: o.nvda, solo: o.solo, soloYou: o.soloYou, motherlodeHit: o.motherlodeHit });
     setLast({ tile: o.tile, solo: o.solo, winner: o.soloYou ? "You" : MINERS[Math.floor(Math.random() * MINERS.length)].a });
   }, []);
 
@@ -223,9 +233,9 @@ export default function MinePage() {
                 {`+${fmt(result.usdgDelta)} USDG`}
                 {result.solo
                   ? result.soloYou
-                    ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP 🏆`
-                    : " · solo round (DRIP went to one winner)"
-                  : ` · +${fmt(result.drip, 3)} DRIP`}
+                    ? ` · SOLO — all ${fmt(result.drip, 3)} DRIP + ${fmt(result.nvda, 4)} NVDA 🏆`
+                    : " · solo round (DRIP + NVDA went to one winner)"
+                  : ` · +${fmt(result.drip, 3)} DRIP · +${fmt(result.nvda, 4)} NVDA`}
               </>
             ) : (
               "You had no stake on the winning tile."
@@ -342,6 +352,8 @@ export default function MinePage() {
                 <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWon, 2)}</span>
                 <span className="text-mute">+</span>
                 <span className="flex items-center gap-1"><Drip /> {fmt(unrefined, 4)}</span>
+                <span className="text-mute">+</span>
+                <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaWon, 4)}</span>
                 <span className="text-mute/70">›</span>
               </button>
             </Row>
@@ -381,6 +393,13 @@ export default function MinePage() {
             <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(claimed, 4)}</div>
             <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
           </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-ink/40 p-3">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-mute">NVDA won</div>
+            <div className="mt-0.5 text-[11px] text-mute">4% of each round&rsquo;s cut buys NVDA for winners</div>
+          </div>
+          <div className="flex items-center gap-1 text-xl font-semibold text-white"><Nvda /> {fmt(nvdaWon, 4)}</div>
         </div>
         <button onClick={() => setShowRewards(true)} disabled={unrefined <= 0}
           className="mt-3 w-full rounded-xl bg-lime py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
@@ -457,6 +476,7 @@ export default function MinePage() {
               <div className="mt-3 space-y-3 text-sm">
                 <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined, 6)}</span></Row>
                 <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimed, 6)}</span></Row>
+                <Row label="NVDA won"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWon, 6)}</span></Row>
                 <Row label="USDG won"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWon)}</span></Row>
               </div>
             </div>
@@ -518,4 +538,19 @@ function Usdg({ big }: { big?: boolean }) {
   const s = big ? 22 : 13;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src="/usdg.png" alt="USDG" width={s} height={s} className="inline-block shrink-0 rounded-full" />;
+}
+
+// NVDA glyph — the tokenized-NVIDIA reward. A neutral "N" chip in the app's palette (not the
+// NVIDIA brand mark). Used for the 4% winners' NVDA slice.
+function Nvda({ big }: { big?: boolean }) {
+  const s = big ? 22 : 14;
+  return (
+    <span
+      style={{ width: s, height: s, fontSize: s * 0.6 }}
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-lime font-bold leading-none text-ink"
+      aria-label="NVDA"
+    >
+      N
+    </span>
+  );
 }

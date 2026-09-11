@@ -31,6 +31,11 @@ export function Faucet() {
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!addresses.drip, refetchInterval: 5000 },
   });
+  const nvda = useReadContract({
+    address: addresses.nvda || undefined, abi: balAbi, functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!addresses.nvda, refetchInterval: 5000 },
+  });
 
   if (!contractsReady || !isConnected || !address) return null;
 
@@ -58,6 +63,7 @@ export function Faucet() {
           <div className="text-xs uppercase tracking-wide text-mute">Your testnet balance</div>
           <div className="mt-0.5 text-sm font-semibold text-white">
             {fmt(usdg.data as bigint | undefined, 6)} USDG · {fmt(drip.data as bigint | undefined, 18, 4)} DRIP
+            {addresses.nvda ? ` · ${fmt(nvda.data as bigint | undefined, 18, 4)} NVDA` : ""}
           </div>
         </div>
         <button
