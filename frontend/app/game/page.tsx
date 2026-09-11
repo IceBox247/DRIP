@@ -46,7 +46,11 @@ export default function MinePage() {
   // connecting; a wallet is only required to actually deploy. Falls back to the demo only when the
   // contracts aren't configured or the chain isn't reachable.
   const chain = useLiveRound(contractsReady);
-  const live = contractsReady && chain.ready; // showing real chain data (connected or not)
+  // "Live" = real chain data, NEVER the random demo, whenever the contracts are configured (always on
+  // mainnet). We deliberately do NOT wait for chain.ready: a slow first read now shows zeros briefly
+  // and then the real values, instead of flashing random demo numbers that change on every refresh.
+  const live = contractsReady;
+  const chainReady = chain.ready; // real values have loaded (vs. still 0/empty on first paint)
   const liveMiners = useLiveMiners(chain.round, live); // real participants in the current round
   // Unclaimed winnings across every settled round the wallet played (pre-harvest), so you can SEE and
   // harvest each round — not just the latest one.
@@ -106,7 +110,9 @@ export default function MinePage() {
   // When live, the header + grid + timer reflect the chain; otherwise the demo drives them. Each tile
   // shows the wallet's OWN stake (mine) and the rest (others), so the total is mine + others.
   const tilesShown: Tile[] = live
-    ? chain.tiles.map((tot, i) => ({ mine: chain.mine[i] ?? 0, others: Math.max(0, tot - (chain.mine[i] ?? 0)) }))
+    ? (chain.tiles.length === N
+        ? chain.tiles.map((tot, i) => ({ mine: chain.mine[i] ?? 0, others: Math.max(0, tot - (chain.mine[i] ?? 0)) }))
+        : empty()) // real mode, still loading → zeros (deterministic), never random demo tiles
     : tiles;
   const poolShown = live ? chain.pool : pool;
   const timeShown = live ? chain.timeLeft : timeLeft;
@@ -344,8 +350,9 @@ export default function MinePage() {
     setUsdgWon(0);
   };
 
-  // Populate the grid on the client (avoids an SSR/client hydration mismatch from Math.random).
-  useEffect(() => { setTiles(seeded()); }, []);
+  // Populate the demo grid on the client (avoids an SSR/client hydration mismatch from Math.random).
+  // Only in demo mode — on mainnet (contracts configured) the grid is real chain data, never random.
+  useEffect(() => { if (!contractsReady) setTiles(seeded()); }, []);
 
   // Countdown — demo only (when live, the chain + keeper drive the round). At zero, run the reveal.
   useEffect(() => {
@@ -458,7 +465,7 @@ export default function MinePage() {
                         : sel ? "border-white ring-1 ring-white/60"
                         : "border-line bg-panel/40 hover:border-mute/50"
                     } ${t.mine > 0 && !lit ? "bg-lime/5" : ""} ${revealing && !lit ? "opacity-50" : ""}`}>
-                    {sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
+                    {!live && sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
                     {/* Your own stake on this tile (top) — shown above the tile's total (bottom), like ORE. */}
                     {t.mine > 0 && (
                       <div className="absolute left-1 top-1 flex items-center gap-0.5 text-[10px] font-semibold text-lime">
