@@ -596,7 +596,7 @@ export default function MinePage() {
         {live && pending.rounds.length > 0 && (
           <div className="mb-4 rounded-xl border border-lime/40 bg-lime/10 p-3">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-white">🎉 You won — harvest to claim</div>
+              <div className="text-sm font-semibold text-white">🎉 You mined — harvest to claim</div>
               <div className="flex items-center gap-2 text-[11px] text-mute">{pending.rounds.length} round{pending.rounds.length > 1 ? "s" : ""}</div>
             </div>
             <div className="mt-2 space-y-1.5">
@@ -630,7 +630,7 @@ export default function MinePage() {
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Unrefined DRIP</div>
             <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(unrefinedShown, 4)}</div>
-            <div className="mt-0.5 text-[11px] text-mute">won — refine to claim</div>
+            <div className="mt-0.5 text-[11px] text-mute">mined — refine to claim</div>
           </div>
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Refined DRIP</div>
@@ -640,7 +640,7 @@ export default function MinePage() {
         </div>
         <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-ink/40 p-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-mute">NVDA won</div>
+            <div className="text-[11px] uppercase tracking-wide text-mute">NVDA mined</div>
             <div className="mt-0.5 text-[11px] text-mute">4% of each round&rsquo;s cut buys NVDA for winners</div>
           </div>
           <div className="flex items-center gap-1 text-xl font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 4)}</div>
@@ -795,8 +795,8 @@ export default function MinePage() {
               <div className="mt-3 space-y-3 text-sm">
                 <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefinedShown, 6)}</span></Row>
                 <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimedShown, 6)}</span></Row>
-                <Row label="NVDA won"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 6)}</span></Row>
-                <Row label="USDG won"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWonShown)}</span></Row>
+                <Row label="NVDA mined"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 6)}</span></Row>
+                <Row label="USDG claimable"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWonShown)}</span></Row>
               </div>
             </div>
 
