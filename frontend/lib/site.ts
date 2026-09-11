@@ -23,7 +23,7 @@ export const site = {
     // TODO: replace with real URLs before launch.
     app: "/game", // the old passive-node dashboard is retired; the app is Grid Mine
     game: "/game",
-    x: "https://x.com",
+    x: "https://x.com/Drip_Robinhood",
     github: "https://github.com/IceBox247/DRIP",
     spec: "https://github.com/IceBox247/DRIP/blob/main/docs/SPEC.md",
     docs: "https://github.com/IceBox247/DRIP/tree/main/docs",
