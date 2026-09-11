@@ -9,6 +9,7 @@ import {RefiningVault} from "../src/game/RefiningVault.sol";
 import {StakeVault} from "../src/game/StakeVault.sol";
 import {ISwapRouter} from "../src/game/interfaces/ISwapRouter.sol";
 import {IRandomnessSource} from "../src/game/interfaces/IRandomnessSource.sol";
+import {CommitRevealRandomness} from "../src/game/CommitRevealRandomness.sol";
 import {MockERC20} from "../src/game/mocks/MockERC20.sol";
 import {MockRandomness} from "../src/game/mocks/MockRandomness.sol";
 import {MockSwapRouter} from "../src/game/mocks/MockSwapRouter.sol";
@@ -52,10 +53,23 @@ contract DeployGame is Script {
             swapRouter = address(new MockSwapRouter());
             console2.log("MockSwapRouter:", swapRouter);
         }
-        bool mockRng = randomness == address(0);
-        if (mockRng) {
-            randomness = address(new MockRandomness());
-            console2.log("MockRandomness:", randomness);
+        // Randomness source. If RANDOMNESS is given, use it. Else RNG_MODE picks: "commit-reveal"
+        // deploys the bonded CommitRevealRandomness (the mainnet path, still unaudited); anything else
+        // (default) deploys MockRandomness for testnet convenience.
+        bool mockRng = false;
+        bool commitReveal = false;
+        if (randomness == address(0)) {
+            string memory rngMode = vm.envOr("RNG_MODE", string("mock"));
+            if (keccak256(bytes(rngMode)) == keccak256(bytes("commit-reveal"))) {
+                CommitRevealRandomness cr = new CommitRevealRandomness(deployer);
+                randomness = address(cr);
+                commitReveal = true;
+                console2.log("CommitRevealRandomness:", randomness);
+            } else {
+                randomness = address(new MockRandomness());
+                mockRng = true;
+                console2.log("MockRandomness:", randomness);
+            }
         }
 
         DripToken drip = new DripToken(cap, deployer); // fixed supply → deployer (== the Pons launch)
@@ -68,6 +82,11 @@ contract DeployGame is Script {
 
         refining.setGridMine(address(gridMine));
         if (mockRng) MockRandomness(randomness).setConsumer(address(gridMine));
+        if (commitReveal) {
+            // Wire the consumer; operator + bond are configured post-deploy by the owner (keeper wallet).
+            CommitRevealRandomness(randomness).setConsumer(address(gridMine));
+            console2.log("NOTE: set operator + fund bond + queue commitments on CommitRevealRandomness.");
+        }
         // Seed the MOCK router with DRIP + NVDA so per-round buys have liquidity in testing. On mainnet
         // the router is the real Pons/Uniswap-v4 pool — do NOT do this.
         if (mockRouter) {
