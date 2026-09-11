@@ -36,8 +36,9 @@ export default function MinePage() {
   const [selected, setSelected] = useState<number[]>([]);
   const [amount, setAmount] = useState(10);
   const [usdg, setUsdg] = useState(START_USDG);
-  const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet claimed
+  const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet refined
   const [claimed, setClaimed] = useState(0); // refined DRIP, in wallet
+  const [usdgWon, setUsdgWon] = useState(0); // USDG winnings, claimable (like ORE's SOL)
   const [showRewards, setShowRewards] = useState(false); // rewards/claim overlay
   const [claimPct, setClaimPct] = useState(100);
   const [motherlode, setMotherlode] = useState(26);
@@ -97,7 +98,8 @@ export default function MinePage() {
 
   const applyOutcome = useCallback((o: ReturnType<typeof computeOutcome>) => {
     setMotherlode(o.newMotherlode);
-    if (o.usdgDelta > 0) setUsdg((u) => Math.round((u + o.usdgDelta) * 100) / 100);
+    // USDG winnings accrue as a claimable balance (like ORE's SOL) instead of auto-crediting.
+    if (o.usdgDelta > 0) setUsdgWon((w) => Math.round((w + o.usdgDelta) * 100) / 100);
     if (o.drip > 0) setUnrefined((d) => Math.round((d + o.drip) * 1e6) / 1e6);
     setResult({ tile: o.tile, won: o.usdgDelta > 0, usdgDelta: o.usdgDelta, drip: o.drip, solo: o.solo, soloYou: o.soloYou, motherlodeHit: o.motherlodeHit });
     setLast({ tile: o.tile, solo: o.solo, winner: o.soloYou ? "You" : MINERS[Math.floor(Math.random() * MINERS.length)].a });
@@ -132,6 +134,12 @@ export default function MinePage() {
     if (amt <= 0) return;
     setClaimed((c) => Math.round((c + amt * (1 - gridMine.refineFeeBps / 10000)) * 1e6) / 1e6);
     setUnrefined((u) => Math.max(0, Math.round((u - amt) * 1e6) / 1e6));
+  };
+
+  const claimUsdg = () => {
+    if (usdgWon <= 0) return;
+    setUsdg((u) => Math.round((u + usdgWon) * 100) / 100);
+    setUsdgWon(0);
   };
 
   // Populate the grid on the client (avoids an SSR/client hydration mismatch from Math.random).
@@ -300,6 +308,8 @@ export default function MinePage() {
             </Row>
             <Row label="REWARDS">
               <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
+                <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWon, 2)}</span>
+                <span className="text-mute">+</span>
                 <span className="flex items-center gap-1"><Drip /> {fmt(unrefined, 4)}</span>
                 <span className="text-mute/70">›</span>
               </button>
@@ -411,8 +421,16 @@ export default function MinePage() {
               <div className="mt-3 space-y-3 text-sm">
                 <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined, 6)}</span></Row>
                 <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimed, 6)}</span></Row>
+                <Row label="USDG won"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWon)}</span></Row>
               </div>
             </div>
+
+            <button
+              onClick={() => { claimUsdg(); setShowRewards(false); }}
+              disabled={usdgWon <= 0}
+              className="mt-4 w-full rounded-2xl bg-white py-4 text-base font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
+              {usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
+            </button>
           </div>
         </div>
       )}
