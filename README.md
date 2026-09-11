@@ -1,73 +1,112 @@
-# Drip ($DRIP)
+# Drip ($DRIP) — Grid Mine on Robinhood Chain
 
-A **fair-launch ERC-20** on **Robinhood Chain** (launched via **Pons**) whose **trade fee** funds a
-**tokenized-stock reward pool**. The team holds no tokens. Users run an in-app "mining node" (a
-server-side accrual timer — **not** real mining) and earn *hash rate* from their DRIP holdings plus
-task and referral boosts; hash rate accrues points, and points entitle users to claim real Stock
-Tokens bought by the fee engine.
+![License: MIT](https://img.shields.io/badge/License-MIT-informational)
+![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636)
+![Foundry](https://img.shields.io/badge/Built%20with-Foundry-red)
+![Tests](https://img.shields.io/badge/contract%20tests-28%20passing-brightgreen)
+![Chain](https://img.shields.io/badge/Robinhood%20Chain-4663-c6f24e)
 
-**Pons (the launchpad) collects the fee — we don't.** DRIP is a plain ERC-20 with no fee logic; no
-Uniswap hook, no tax-on-transfer on our side. Pons's venue takes the trade fee, keeps its protocol
-cut, and pays our **creator share in USDG** to a payout wallet we designate (via Pons automation).
-Our system distributes that USDG (~2/3 → Stock Tokens, ~1/3 → marketing/ops) and runs the reward
-engine. See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+**Drip** is a fair-launch ERC-20 on **Robinhood Chain** with an on-chain, ORE-style grid game — **Grid
+Mine**. Twenty-five tiles, a sixty-second round, one winning tile. Players deploy **USDG** onto tiles;
+a randomness source picks the winner; losers' USDG is redistributed to the winners, and a slice of
+every round automatically **buys $DRIP and tokenized NVDA on-chain** to reward winners, feed stakers,
+grow a jackpot, and burn supply. The team holds no tokens.
 
-> **Fee-size caveat:** Pons's default nets the creator only ~0.7% of volume, not 3%. Netting ~3%
-> requires configuring a **high trade fee at launch** — which is locked forever and suppresses
-> volume. This is the key open risk; see [`docs/BLOCKERS.md`](./docs/BLOCKERS.md) #3.
+> **25 blocks. 60 seconds. One winning block.** Deploy USDG, claim your tile, let on-chain randomness decide.
 
-> **The full specification is the source of truth:** [`docs/SPEC.md`](./docs/SPEC.md).
-
----
-
-## ⚠️ Read before building
-
-This project sits on top of hard gates. See [`docs/BLOCKERS.md`](./docs/BLOCKERS.md):
-
-1. **Stock Token transferability** — the reward payout depends on sending Stock Tokens to arbitrary
-   wallets. These were whitelist-gated. **Verify freely transferable on-chain before building the
-   claim layer.**
-2. **Legal / securities exposure** — a bought token + a reward promise looks like an investment
-   contract; Stock Tokens are blocked for US persons. **This repo is not legal advice.** Get counsel,
-   structure offshore, geoblock US **before launch.**
-3. **Pons fee economics** — the reward engine is funded by Pons creator fees (USDG). Pons's default
-   nets ~0.7% of volume, not 3%; the fee is **locked at launch**. Confirm the on-chain fee params
-   and the volume tradeoff before launching.
-4. **Gambling (only if [Grid Mine](./docs/GRID-MINE.md) ships)** — the optional ORE-style grid game
-   is a real-money game of chance, regulated separately from securities. Needs gambling counsel +
-   licensing + geoblock before any real-value play. See [`docs/BLOCKERS.md`](./docs/BLOCKERS.md) #4.
-
-Nothing here should be deployed to mainnet or promoted publicly until the relevant gates clear.
+- App: [driprh.site](https://driprh.site) · Game: [driprh.site/game](https://driprh.site/game)
+- Chain: Robinhood Chain (Arbitrum Orbit L2) — mainnet **4663**, testnet **46630**
+- Full spec: [`docs/SPEC.md`](./docs/SPEC.md) · Game design: [`docs/GRID-MINE.md`](./docs/GRID-MINE.md)
 
 ---
+
+## How a round works
+
+1. **Deploy** — players stake USDG onto any of the 25 tiles in a 60-second round (one transaction,
+   many tiles). A 1% entry fee goes to marketing/ops.
+2. **Settle** — when the window elapses, a randomness source picks the winning tile. The deploy that
+   rolls a finished round settles it automatically — no keeper required to keep play flowing.
+3. **Payout** — winners get their stake back plus **90% of the loser pot in USDG**. The remaining
+   **10% cut** is swapped on-chain and split:
+
+   | Slice of the cut | Destination |
+   |---|---|
+   | 70% | buy $DRIP → **burned** |
+   | 10% | buy $DRIP → **stakers** |
+   | 10% | buy $DRIP → **motherlode** (1/625 jackpot) |
+   | 6%  | buy $DRIP → **winners** (refinable) |
+   | 4%  | buy **NVDA** → **winners** |
+
+4. **Refine** — winner DRIP accrues in a RefiningVault; claiming charges a 10% refine tax that flows
+   to holders who haven't claimed yet (hold longer, earn more).
+
+Nothing is minted — $DRIP is fixed supply. The reward engine only ever **buys** it from the market.
+
+## Real on-chain integrations
+
+The reward engine buys through the actual venues on Robinhood Chain, not a mock:
+
+- **$DRIP** is bought from its **Pons V2 bonding curve** (`buy(quoteIn, minOut, recipient)`), and
+  automatically routes to the token's locked **Uniswap v4** pool once it graduates.
+- **NVDA** (tokenized NVIDIA) is bought from its **Uniswap v4** pool, called through the PoolManager
+  directly (Robinhood's Universal Router is modified). This path is **fork-tested against the live
+  mainnet pool** — see [`contracts/test/game/V4NvdaFork.t.sol`](./contracts/test/game/V4NvdaFork.t.sol).
+
+The swap venue per token lives in [`PonsSwapAdapter`](./contracts/src/game/PonsSwapAdapter.sol) behind
+the game's [`ISwapRouter`](./contracts/src/game/interfaces/ISwapRouter.sol), so the game contract is
+agnostic to how a reward is sourced.
+
+## Contracts
+
+Solidity 0.8.26, Foundry, OpenZeppelin v5. `contracts/src/game/`:
+
+| Contract | Role |
+|---|---|
+| `GridMine.sol` | The round engine: deploy, settle, weighted winner selection, payouts, harvest |
+| `RefiningVault.sol` | Holds winner DRIP; refine-to-claim with the holder tax |
+| `StakeVault.sol` | Stake DRIP, earn the stakers' slice each round |
+| `PonsSwapAdapter.sol` | Buys rewards from the Pons curve / Uniswap v4 pool |
+| `CommitRevealRandomness.sol` | Bonded commit–reveal RNG (unpredictable, un-riggable) |
+| `DripToken.sol` | Fixed-supply, burnable ERC-20 |
+
+```bash
+cd contracts
+forge test            # 28 tests (unit + a live-pool fork test that skips without an RPC)
+forge build
+```
 
 ## Repository layout
 
 ```
-docs/          Canonical spec and planning docs (start here)
-  SPEC.md          Full build specification (source of truth)
-  ARCHITECTURE.md  Component → repo mapping, data flow, on/off-chain boundary
-  ROADMAP.md       Phased build order (§9)
-  DECISIONS.md     Open decisions to resolve before Phase 1 (§7)
-  BLOCKERS.md      Hard gates that can invalidate the design (§8)
-config/        Tunable constants (constants.example.json — §10)
-contracts/     Solidity (Foundry) — DripToken, FeeDistributor, ReserveManager, RewardVault
-backend/       Off-chain points engine + auth (Phase 2)
-keeper/        Automation: launchpad fee receipt + hourly reward cycle (Phase 3)
-frontend/      Web + mobile app (Phase 2)
+contracts/   Solidity (Foundry) — the game engine, vaults, swap adapter, RNG, tests
+frontend/    Next.js 14 + wagmi/viem app (the Mine/Stake/Trade/Chat UI)
+keeper/       Round automation notes (settle + process rewards)
+backend/      Off-chain chat + auth notes
+docs/         Specification and design docs (SPEC, GRID-MINE, ARCHITECTURE, DECISIONS, BLOCKERS)
+config/       Tunable constants
+.github/      CI + the phone-friendly deploy workflow
 ```
 
-Each subdirectory has its own README describing what belongs there and its build phase.
+## Tech stack
 
-## Current status
+- **Contracts:** Solidity 0.8.26 · Foundry · OpenZeppelin v5
+- **Frontend:** Next.js 14 (App Router) · TypeScript · Tailwind · wagmi 2 / viem 2 · TanStack Query
+- **Data:** Neon Postgres (serverless) for chat
+- **Chain:** Robinhood Chain (Arbitrum Orbit), USDG-quoted markets, Uniswap v4, Pons launchpad
 
-**Phase 0.** This commit establishes the specification, planning docs, and a scaffold of the
-architecture. Contract, backend, keeper, and frontend directories currently hold **skeletons and
-interfaces** with TODOs referencing the spec — not production implementations. Implementation
-follows the phased [roadmap](./docs/ROADMAP.md) once the [open decisions](./docs/DECISIONS.md) are
-resolved and the [blockers](./docs/BLOCKERS.md) are cleared.
+## Status & safety
 
-## Chain
+Grid Mine is deployed and playable on **mainnet** for controlled testing. Before a public launch, two
+gates remain open and are tracked in [`docs/BLOCKERS.md`](./docs/BLOCKERS.md):
 
-Robinhood Chain — mainnet chain ID **4663**, testnet **46630**. EVM, Arbitrum Orbit stack. All
-Phase 1–3 development targets **testnet (46630)** until audit + legal clear the path to mainnet.
+- **Randomness** — the production RNG is the audited [commit–reveal](./contracts/src/game/CommitRevealRandomness.sol)
+  source (or a VRF if one is confirmed on the chain); the mock is testnet/controlled-test only.
+- **Legal** — a real-money game of chance plus stock-token rewards is regulated. Counsel, licensing,
+  and geoblocking are required before opening to the public. This repository is engineering
+  scaffolding, **not legal advice**.
+
+No public launch or reward promises until those clear.
+
+## License
+
+[MIT](./LICENSE).

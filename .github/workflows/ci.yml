@@ -1,0 +1,60 @@
+name: CI
+
+# Runs the contract test suite and the frontend typecheck/lint on every push and PR, so each commit
+# carries a green check. Fork tests (against live pools) auto-skip here since no RPC is provided.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  contracts:
+    name: Contracts (Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install pinned dependencies
+        working-directory: contracts
+        run: |
+          set -eo pipefail
+          # lib/ is gitignored — fetch the exact versions the code builds against.
+          rm -rf lib && mkdir -p lib
+          git clone --recurse-submodules https://github.com/foundry-rs/forge-std lib/forge-std
+          git -C lib/forge-std checkout 16cb9c998736cab8f14aebd5199cdf6a02fde055
+          git -C lib/forge-std submodule update --init --recursive
+          git clone --branch v5.1.0 --depth 1 https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts
+
+      - name: Build
+        working-directory: contracts
+        run: forge build
+
+      - name: Test
+        working-directory: contracts
+        run: forge test -vv
+
+  frontend:
+    name: Frontend (typecheck + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint --if-present

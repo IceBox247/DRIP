@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
 // Foundry deploy scripts go here (Phase 1+). e.g. Deploy.s.sol.
