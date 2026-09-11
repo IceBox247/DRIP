@@ -5,6 +5,7 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 import { formatUnits, maxUint256, parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi, swapAdapterAbi } from "@/lib/contracts";
+import { compact } from "@/lib/format";
 
 // Trade — REAL swap. Buying DRIP (USDG→DRIP) routes through the deployed PonsSwapAdapter, which buys
 // from the Pons bonding curve and sends DRIP to the caller. The quote is a real on-chain simulation of
@@ -167,7 +168,7 @@ export default function TradePage() {
                 <span>You receive (est.)</span><span>DRIP</span>
               </div>
               <div className="mt-1 text-2xl font-semibold text-white">
-                {amount <= 0 ? "0.0000" : quoting ? "…" : est !== null ? fmt(est, 4) : "—"}
+                {amount <= 0 ? "0.0000" : quoting ? "…" : est !== null ? compact(est) : "—"}
               </div>
             </div>
 
@@ -189,7 +190,7 @@ export default function TradePage() {
 
         <div className="mt-5 flex justify-between rounded-2xl border border-line bg-panel/60 px-4 py-3 text-sm">
           <span className="text-mute">Your balances</span>
-          <span className="font-semibold text-white">{fmt(usdg, 2)} USDG · {fmt(drip, 2)} DRIP</span>
+          <span className="font-semibold text-white">{compact(usdg)} USDG · {compact(drip)} DRIP</span>
         </div>
 
         <p className="mt-8 text-center text-[11px] text-mute/60">On-chain · buys route through the Pons bonding curve. 3% max slippage.</p>

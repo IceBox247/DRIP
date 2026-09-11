@@ -5,6 +5,7 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 import { formatUnits, maxUint256, parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi } from "@/lib/contracts";
+import { compact } from "@/lib/format";
 
 // Stake — REAL stake-to-earn against StakeVault on Robinhood Chain. Stake DRIP, earn the 10% stakers'
 // slice of every buyback (paid in DRIP). Reads staked/earned/totalStaked on-chain; stake/withdraw/
@@ -131,7 +132,7 @@ export default function StakePage() {
             className="w-full bg-transparent text-center text-6xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <div className="mt-2 text-sm text-mute">
-            DRIP · {tab === "deposit" ? `wallet ${fmt(walletDrip)}` : `staked ${fmt(stakedShown)}`}
+            DRIP · {tab === "deposit" ? `wallet ${compact(walletDrip)}` : `staked ${compact(stakedShown)}`}
           </div>
         </div>
 
@@ -154,7 +155,7 @@ export default function StakePage() {
         <div className="mt-6 flex items-center justify-between rounded-2xl border border-line bg-panel p-4">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-mute">Claimable rewards</div>
-            <div className="mt-0.5 text-xl font-semibold text-white">{fmt(earnedShown)} DRIP</div>
+            <div className="mt-0.5 text-xl font-semibold text-white">{compact(earnedShown)} DRIP</div>
           </div>
           <button onClick={claim} disabled={busy || earnedShown <= 0}
             className="rounded-xl bg-lime px-4 py-2.5 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
@@ -165,8 +166,8 @@ export default function StakePage() {
         <div className="mt-6">
           <h2 className="text-2xl font-semibold text-white">Summary</h2>
           <div className="mt-4 space-y-3 text-sm">
-            <SummaryRow label="Your stake" value={`${fmt(stakedShown)} DRIP`} />
-            <SummaryRow label="Total staked" value={`${fmt(totalShown, 2)} DRIP`} />
+            <SummaryRow label="Your stake" value={`${compact(stakedShown)} DRIP`} />
+            <SummaryRow label="Total staked" value={`${compact(totalShown)} DRIP`} />
             <SummaryRow label="Your share" value={totalShown > 0 ? `${fmt((stakedShown / totalShown) * 100, 2)}%` : "—"} />
             <SummaryRow label="Source" value="10% of each buyback" />
           </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MorePage } from "@/components/MorePage";
 import { contractsReady } from "@/lib/contracts";
+import { compact } from "@/lib/format";
 import { gridMine } from "@/lib/site";
 import { useExploreStats } from "@/lib/useExploreStats";
 
@@ -24,17 +25,17 @@ export default function ExplorePage() {
       <Section title="Overview">
         <Grid>
           <Stat label="Rounds settled" value={fmt(s.roundsSettled)} sub="all-time" />
-          <Stat label="Motherlode pool" value={`${fmt(s.motherlode, 2)} DRIP`} sub="current jackpot" />
+          <Stat label="Motherlode pool" value={`${compact(s.motherlode)} DRIP`} sub="current jackpot" />
           <Stat label="Entry fee" value={`${gridMine.adminFeeBps / 100}%`} sub="→ marketing/ops" />
-          <Stat label="DRIP supply" value={`${fmt(s.totalSupply)} DRIP`} sub="fixed — never minted" />
+          <Stat label="DRIP supply" value={`${compact(s.totalSupply)} DRIP`} sub="fixed — never minted" />
         </Grid>
       </Section>
 
       <Section title="Mining (recent)">
         <Grid>
-          <Stat label="Deployed" value={`${fmt(s.deployedWindow, 2)} USDG`} sub="recent on-chain window" />
+          <Stat label="Deployed" value={`${compact(s.deployedWindow)} USDG`} sub="recent on-chain window" />
           <Stat label="Unique miners" value={fmt(s.uniqueMiners)} sub="recent wallets" />
-          <Stat label="Total staked" value={`${fmt(s.totalStaked, 2)} DRIP`} sub="in StakeVault" />
+          <Stat label="Total staked" value={`${compact(s.totalStaked)} DRIP`} sub="in StakeVault" />
           <Stat label="Solo odds" value={`1 / ${gridMine.soloOdds}`} sub="1-or-all" />
         </Grid>
       </Section>
@@ -81,9 +82,9 @@ export default function ExplorePage() {
                         ? <span className="rounded-full bg-yellow-500 px-2.5 py-0.5 text-[11px] font-semibold text-ink">🎰 Motherlode</span>
                         : <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink">{row.soloMode ? "Solo" : "Split"}</span>}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{fmt(row.totalIn, 2)}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{fmt(row.winnerPotUsdg, 2)}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Drip />{fmt(row.rewardDrip, 2)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{compact(row.totalIn)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{compact(row.winnerPotUsdg)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right"><Drip />{compact(row.rewardDrip)}</td>
                 </tr>
               ))}
             </tbody>
@@ -106,7 +107,7 @@ export default function ExplorePage() {
               </span>
               <span className="flex items-center gap-3 text-mute">
                 <span className="text-xs">{r.tiles} tiles</span>
-                <span className="font-semibold text-white">{fmt(r.total, 2)} USDG</span>
+                <span className="font-semibold text-white">{compact(r.total)} USDG</span>
               </span>
             </div>
           ))}

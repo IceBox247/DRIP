@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import { addresses, contractsReady, isTestnet } from "@/lib/contracts";
+import { compact } from "@/lib/format";
 
 // Faucet + live balances. Renders only when the game contracts are configured AND a wallet is
 // connected. Preferred path is GASLESS: it POSTs to /api/faucet, where the keeper wallet pays the
@@ -20,6 +21,7 @@ const mintAbi = [
 
 const fmt = (v: bigint | undefined, dec: number, show = 2) =>
   v === undefined ? "—" : Number(formatUnits(v, dec)).toLocaleString("en-US", { maximumFractionDigits: show });
+const cfmt = (v: bigint | undefined, dec: number) => (v === undefined ? "—" : compact(Number(formatUnits(v, dec))));
 
 export function Faucet() {
   const { address, isConnected } = useAccount();
@@ -90,7 +92,7 @@ export function Faucet() {
         <div>
           <div className="text-xs uppercase tracking-wide text-mute">{isTestnet ? "Your testnet balance" : "Your balance"}</div>
           <div className="mt-0.5 text-sm font-semibold text-white">
-            {fmt(usdg.data as bigint | undefined, 6)} USDG · {fmt(drip.data as bigint | undefined, 18, 4)} DRIP
+            {fmt(usdg.data as bigint | undefined, 6)} USDG · {cfmt(drip.data as bigint | undefined, 18)} DRIP
             {addresses.nvda ? ` · ${fmt(nvda.data as bigint | undefined, 18, 4)} NVDA` : ""}
           </div>
         </div>

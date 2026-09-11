@@ -10,6 +10,7 @@ import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
 import { useRoundHistory } from "@/lib/useRoundHistory";
+import { compact } from "@/lib/format";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -384,7 +385,7 @@ export default function MinePage() {
       {/* Stat header */}
       <div className="grid grid-cols-3 px-4 py-6 text-center">
         <Stat label="DEPLOYED" value={fmt(poolShown)} accent />
-        <Stat label="MOTHERLODE" value={fmt(motherlodeShown, 0)} gold border />
+        <Stat label="MOTHERLODE" value={compact(motherlodeShown)} gold border />
         <Stat label="TIME" value={result ? "00:00" : revealing ? "···" : `${mm}:${ss}`} danger={!busy && timeShown <= 10} />
       </div>
 
@@ -560,7 +561,7 @@ export default function MinePage() {
               <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
                 <span className="flex items-center gap-1"><Usdg /> {fmt(usdgWonShown, 2)}</span>
                 <span className="text-mute">+</span>
-                <span className="flex items-center gap-1"><Drip /> {fmt(dripAvailShown, 4)}</span>
+                <span className="flex items-center gap-1"><Drip /> {compact(dripAvailShown)}</span>
                 <span className="text-mute">+</span>
                 <span className="flex items-center gap-1"><Nvda /> {fmt(nvdaAvailShown, 4)}</span>
                 <span className="text-mute/70">›</span>
@@ -605,8 +606,8 @@ export default function MinePage() {
                   <div>
                     <div className="font-semibold text-white">Round #{r.round}</div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-mute">
-                      {r.usdg > 0 && <span className="flex items-center gap-1"><Usdg /> {fmt(r.usdg, 2)}</span>}
-                      {r.drip > 0 && <span className="flex items-center gap-1"><Drip /> {fmt(r.drip, 3)}</span>}
+                      {r.usdg > 0 && <span className="flex items-center gap-1"><Usdg /> {compact(r.usdg)}</span>}
+                      {r.drip > 0 && <span className="flex items-center gap-1"><Drip /> {compact(r.drip)}</span>}
                       {r.nvda > 0 && <span className="flex items-center gap-1"><Nvda /> {fmt(r.nvda, 4)}</span>}
                     </div>
                   </div>
@@ -629,12 +630,12 @@ export default function MinePage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Unrefined DRIP</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(unrefinedShown, 4)}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {compact(unrefinedShown)}</div>
             <div className="mt-0.5 text-[11px] text-mute">mined — refine to claim</div>
           </div>
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Refined DRIP</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {fmt(claimedShown, 4)}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {compact(claimedShown)}</div>
             <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
           </div>
         </div>
@@ -739,7 +740,7 @@ export default function MinePage() {
                     <span className="flex items-center gap-1 text-mute">pool <span className="font-semibold text-white"><Usdg /> {fmt(r.totalIn, 2)}</span></span>
                     <span className="flex items-center gap-1 text-mute">winners <span className="font-semibold text-white"><Usdg /> {fmt(r.winnerPotUsdg, 2)}</span></span>
                     {r.rewardsProcessed
-                      ? <span className="flex items-center gap-1 text-mute"><Drip /> <span className="font-semibold text-white">{fmt(r.rewardDrip, 2)}</span></span>
+                      ? <span className="flex items-center gap-1 text-mute"><Drip /> <span className="font-semibold text-white">{compact(r.rewardDrip)}</span></span>
                       : <span className="text-yellow-500/80">rewards pending</span>}
                   </div>
                 </div>
@@ -776,10 +777,10 @@ export default function MinePage() {
 
             <div className="mt-6 space-y-3 text-sm">
               <Row label="You receive">
-                <span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefinedShown * claimPct / 100 * (1 - gridMine.refineFeeBps / 10000), 4)}</span>
+                <span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(unrefinedShown * claimPct / 100 * (1 - gridMine.refineFeeBps / 10000))}</span>
               </Row>
               <Row label={`Refining fee (${gridMine.refineFeeBps / 100}%)`}>
-                <span className="flex items-center gap-1 font-semibold text-mute"><Drip /> {fmt(unrefinedShown * claimPct / 100 * (gridMine.refineFeeBps / 10000), 4)}</span>
+                <span className="flex items-center gap-1 font-semibold text-mute"><Drip /> {compact(unrefinedShown * claimPct / 100 * (gridMine.refineFeeBps / 10000))}</span>
               </Row>
             </div>
 
@@ -793,8 +794,8 @@ export default function MinePage() {
             <div className="mt-6">
               <h3 className="text-sm font-semibold text-white">Balances</h3>
               <div className="mt-3 space-y-3 text-sm">
-                <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefinedShown, 6)}</span></Row>
-                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimedShown, 6)}</span></Row>
+                <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(unrefinedShown)}</span></Row>
+                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(claimedShown)}</span></Row>
                 <Row label="NVDA mined"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 6)}</span></Row>
                 <Row label="USDG claimable"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWonShown)}</span></Row>
               </div>
