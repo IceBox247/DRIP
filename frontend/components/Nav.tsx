@@ -30,14 +30,6 @@ export function Nav() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <a
-            href={site.links.github}
-            target="_blank"
-            rel="noreferrer"
-            className="hidden text-sm text-mute transition-colors hover:text-white sm:inline"
-          >
-            GitHub
-          </a>
           <Link
             href={site.links.game}
             className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"

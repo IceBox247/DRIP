@@ -23,8 +23,6 @@ export function Footer() {
             </div>
             <div className="flex flex-col gap-2 text-sm">
               <span className="mb-1 text-xs uppercase tracking-wide text-mute/70">Resources</span>
-              <a href={site.links.spec} target="_blank" rel="noreferrer" className="text-mute hover:text-white">Spec</a>
-              <a href={site.links.github} target="_blank" rel="noreferrer" className="text-mute hover:text-white">GitHub</a>
               <a href={site.links.x} target="_blank" rel="noreferrer" className="text-mute hover:text-white">X</a>
             </div>
           </div>

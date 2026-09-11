@@ -123,9 +123,6 @@ export default function AboutPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {[
-              { label: "GitHub", href: site.links.github },
-              { label: "Spec", href: site.links.spec },
-              { label: "Docs", href: site.links.docs },
               { label: "X", href: site.links.x },
             ].map((l) => (
               <a key={l.label} href={l.href} target="_blank" rel="noreferrer"

@@ -19,8 +19,6 @@ const items: Item[] = [
 ];
 
 const external: Item[] = [
-  { href: site.links.github, label: "GitHub", desc: "Contracts, tests & this app", icon: <CodeIcon />, external: true },
-  { href: site.links.docs, label: "Docs", desc: "Full spec, architecture & blockers", icon: <DocIcon />, external: true },
   { href: site.links.x, label: "X / Twitter", desc: "Follow for launch updates", icon: <XIcon />, external: true },
 ];
 
@@ -71,6 +69,4 @@ function VaultIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fi
 function ShieldIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M10 3l6 2v4c0 4-3 6-6 8-3-2-6-4-6-8V5l6-2z" /><path d="M7.5 10l2 2 3.5-4" strokeLinecap="round" /></svg>; }
 function InfoIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="10" cy="10" r="7" /><path d="M10 9v4M10 6.5v.5" strokeLinecap="round" /></svg>; }
 function ListIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M7 6h9M7 10h9M7 14h9M4 6h.01M4 10h.01M4 14h.01" /></svg>; }
-function CodeIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 6l-4 4 4 4M13 6l4 4-4 4" /></svg>; }
-function DocIcon() { return <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M5 3h6l4 4v10H5z" /><path d="M11 3v4h4M7.5 11h5M7.5 14h5" strokeLinecap="round" /></svg>; }
 function XIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2h3.3l-7.2 8.3L23.5 22h-6.6l-5.2-6.8L5.8 22H2.5l7.7-8.9L1.5 2h6.8l4.7 6.2L18.9 2z" /></svg>; }
