@@ -10,6 +10,8 @@ import {StakeVault} from "../src/game/StakeVault.sol";
 import {ISwapRouter} from "../src/game/interfaces/ISwapRouter.sol";
 import {IRandomnessSource} from "../src/game/interfaces/IRandomnessSource.sol";
 import {CommitRevealRandomness} from "../src/game/CommitRevealRandomness.sol";
+import {PonsSwapAdapter} from "../src/game/PonsSwapAdapter.sol";
+import {PoolKey} from "../src/game/interfaces/IUniswapV4.sol";
 import {MockERC20} from "../src/game/mocks/MockERC20.sol";
 import {MockRandomness} from "../src/game/mocks/MockRandomness.sol";
 import {MockSwapRouter} from "../src/game/mocks/MockSwapRouter.sol";
@@ -48,10 +50,25 @@ contract DeployGame is Script {
             nvda = address(new MockERC20("NVIDIA (mock)", "NVDA", 18));
             console2.log("MockERC20 NVDA:", nvda);
         }
-        bool mockRouter = swapRouter == address(0);
-        if (mockRouter) {
-            swapRouter = address(new MockSwapRouter());
-            console2.log("MockSwapRouter:", swapRouter);
+        // Swap router. If SWAP_ROUTER is given, use it as-is. Else SWAP_MODE picks: "pons" deploys the
+        // real PonsSwapAdapter (buys DRIP from its Pons bonding curve + NVDA from its Uniswap v4 pool);
+        // anything else deploys the fixed-rate MockSwapRouter for testnet.
+        bool mockRouter = false;
+        bool ponsRouter = false;
+        PonsSwapAdapter ponsAdapter;
+        if (swapRouter == address(0)) {
+            string memory swapMode = vm.envOr("SWAP_MODE", string("mock"));
+            if (keccak256(bytes(swapMode)) == keccak256(bytes("pons"))) {
+                address poolManager = vm.envOr("POOL_MANAGER", 0x8366a39CC670B4001A1121B8F6A443A643e40951);
+                ponsAdapter = new PonsSwapAdapter(deployer, poolManager);
+                swapRouter = address(ponsAdapter);
+                ponsRouter = true;
+                console2.log("PonsSwapAdapter:", swapRouter);
+            } else {
+                swapRouter = address(new MockSwapRouter());
+                mockRouter = true;
+                console2.log("MockSwapRouter:", swapRouter);
+            }
         }
         // Randomness source. If RANDOMNESS is given, use it. Else RNG_MODE picks: "commit-reveal"
         // deploys the bonded CommitRevealRandomness (the mainnet path, still unaudited); anything else
@@ -97,6 +114,29 @@ contract DeployGame is Script {
             CommitRevealRandomness(randomness).setConsumer(address(gridMine));
             console2.log("NOTE: set operator + fund bond + queue commitments on CommitRevealRandomness.");
         }
+        // Wire the real Pons adapter to the actual venues: DRIP bought from its Pons bonding curve,
+        // NVDA from its Uniswap v4 pool. Addresses default to the verified FLYCOINHUNT test config and
+        // can be overridden by env. No liquidity to seed — it buys from the real pools.
+        if (ponsRouter) {
+            address ponsCurve = vm.envOr("PONS_CURVE", 0xa077C42F1f61e6E8F6BAef4B7B1e7e2F5D3eDf86);
+            ponsAdapter.setCurve(dripAddr, ponsCurve);
+            console2.log("Pons curve wired for DRIP:", ponsCurve);
+            // NVDA/USDG v4 pool (from its on-chain Initialize event): dynamic fee, tickSpacing 60.
+            address nvdaHook = vm.envOr("NVDA_V4_HOOK", 0xb3502dc2Fc6BaDf3f184A87Cb3e31f95FfF16181);
+            (address c0, address c1) = usdg < nvda ? (usdg, nvda) : (nvda, usdg);
+            ponsAdapter.setV4Pool(
+                nvda,
+                PoolKey({
+                    currency0: c0,
+                    currency1: c1,
+                    fee: uint24(vm.envOr("NVDA_V4_FEE", uint256(0x800000))),
+                    tickSpacing: int24(int256(vm.envOr("NVDA_V4_TICK_SPACING", uint256(60)))),
+                    hooks: nvdaHook
+                })
+            );
+            console2.log("NVDA v4 pool wired, hook:", nvdaHook);
+        }
+
         // Seed the MOCK router with DRIP + NVDA so per-round buys have liquidity in testing. On mainnet
         // the router is the real Pons/Uniswap-v4 pool — do NOT do this. SEED_DRIP = whole DRIP tokens
         // to move from the deployer to the router (default 100k; for our own DripToken, cap/10).

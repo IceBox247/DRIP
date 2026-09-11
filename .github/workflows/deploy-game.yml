@@ -23,6 +23,11 @@ on:
         type: choice
         options: [testnet, mainnet]
         default: testnet
+      swap_mode:
+        description: "How the reward engine buys DRIP/NVDA. 'pons' = real Pons curve + Uniswap v4 (mainnet). 'mock' = fixed-rate test router."
+        type: choice
+        options: [mock, pons]
+        default: mock
       usdg:
         description: "USDG token address (blank = deploy a mock). Mainnet real USDG: 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
         type: string
@@ -31,8 +36,16 @@ on:
         description: "Existing DRIP token to use (blank = deploy our DripToken). Must have burn(uint256)."
         type: string
         default: ""
+      nvda:
+        description: "NVDA token address (blank = deploy a mock). Mainnet real NVDA: 0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC"
+        type: string
+        default: ""
+      pons_curve:
+        description: "DRIP's Pons bonding curve (pons mode). Blank uses the FLYCOINHUNT curve default."
+        type: string
+        default: ""
       seed_drip:
-        description: "Whole DRIP tokens to move from the deployer into the mock router as liquidity (needs the deployer to hold them)."
+        description: "MOCK mode only: whole DRIP tokens to seed the mock router (needs the deployer to hold them)."
         type: string
         default: "100000"
 
@@ -64,8 +77,10 @@ jobs:
           # Token/router config from the workflow inputs (fall back to secrets if inputs are blank).
           USDG: ${{ inputs.usdg != '' && inputs.usdg || secrets.USDG_ADDRESS }}
           DRIP: ${{ inputs.drip }}
+          NVDA: ${{ inputs.nvda != '' && inputs.nvda || secrets.NVDA_ADDRESS }}
           SEED_DRIP: ${{ inputs.seed_drip }}
-          NVDA: ${{ secrets.NVDA_ADDRESS }}
+          SWAP_MODE: ${{ inputs.swap_mode }}
+          PONS_CURVE: ${{ inputs.pons_curve }}
           SWAP_ROUTER: ${{ secrets.SWAP_ROUTER }}
           RANDOMNESS: ${{ secrets.RANDOMNESS }}
         run: |
@@ -74,6 +89,10 @@ jobs:
             echo "::error::DEPLOYER_PRIVATE_KEY secret is not set. Add it in Settings → Secrets → Actions."
             exit 1
           fi
+          # Blank address envs must be UNSET (not "") so the script's vm.envOr defaults kick in.
+          for v in USDG DRIP NVDA PONS_CURVE SWAP_ROUTER RANDOMNESS; do
+            eval "[ -z \"\${$v}\" ] && unset $v || true"
+          done
           if [ "${{ inputs.network }}" = "mainnet" ]; then
             RPC="https://rpc.mainnet.chain.robinhood.com"
             echo "::warning::Deploying to MAINNET. This uses the mock RNG unless RANDOMNESS is set — do NOT open to real players until secure randomness is wired (blocker #1)."
