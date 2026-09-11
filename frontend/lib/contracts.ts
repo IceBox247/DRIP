@@ -15,17 +15,27 @@ export const robinhoodChain = defineChain({
   blockExplorers: { default: { name: "Blockscout", url: "https://robinhoodchain.blockscout.com" } },
 });
 
-// Deployed addresses — filled via Vercel env after `forge script DeployGame`. Empty string until then.
+// Deployed addresses. Default to the LIVE mainnet deployment (Grid Mine run #6) so the app works
+// out of the box even if a Vercel env is missing or stale; env vars still override for a different
+// deploy. Real USDG + real NVDA; DRIP = FLYCOINHUNT; game contracts from the mainnet deploy.
+const MAINNET = {
+  usdg: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  drip: "0x8f519E3e55b44014d6dD323BB3dE561Bf6CB6f1C",
+  nvda: "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+  gridMine: "0x2b463b2FCa32E4B0532EDb1eaACB6c3EC0BBAf89",
+  refining: "0x93D0b1F57075403bfD289A58850a8331a3a281Ee",
+  stake: "0x6CE30eFA833D207ce8f82797dA1E706b1739Ec11",
+  randomness: "0x97ba2e34574fAe6B7bD7420a1dB1875CEc937Ae5",
+} as const;
+
 export const addresses = {
-  usdg: (process.env.NEXT_PUBLIC_USDG_ADDRESS ?? "") as `0x${string}` | "",
-  drip: (process.env.NEXT_PUBLIC_DRIP_ADDRESS ?? "") as `0x${string}` | "",
-  nvda: (process.env.NEXT_PUBLIC_NVDA_ADDRESS ?? "") as `0x${string}` | "",
-  gridMine: (process.env.NEXT_PUBLIC_GRIDMINE_ADDRESS ?? "") as `0x${string}` | "",
-  refining: (process.env.NEXT_PUBLIC_REFINING_ADDRESS ?? "") as `0x${string}` | "",
-  stake: (process.env.NEXT_PUBLIC_STAKE_ADDRESS ?? "") as `0x${string}` | "",
-  // MockRandomness (testnet only). If set, the "advance round" control seeds a fresh word so the
-  // winning tile varies. On mainnet the source is commit-reveal/VRF and this is unused.
-  randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS ?? "") as `0x${string}` | "",
+  usdg: (process.env.NEXT_PUBLIC_USDG_ADDRESS || MAINNET.usdg) as `0x${string}` | "",
+  drip: (process.env.NEXT_PUBLIC_DRIP_ADDRESS || MAINNET.drip) as `0x${string}` | "",
+  nvda: (process.env.NEXT_PUBLIC_NVDA_ADDRESS || MAINNET.nvda) as `0x${string}` | "",
+  gridMine: (process.env.NEXT_PUBLIC_GRIDMINE_ADDRESS || MAINNET.gridMine) as `0x${string}` | "",
+  refining: (process.env.NEXT_PUBLIC_REFINING_ADDRESS || MAINNET.refining) as `0x${string}` | "",
+  stake: (process.env.NEXT_PUBLIC_STAKE_ADDRESS || MAINNET.stake) as `0x${string}` | "",
+  randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS || MAINNET.randomness) as `0x${string}` | "",
 };
 
 /** True once the game contracts are deployed and their addresses are configured. */

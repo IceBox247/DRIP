@@ -294,12 +294,16 @@ export default function MinePage() {
         <>
           <div className="mx-4 mt-4 flex items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs">
             <span className="uppercase tracking-wide text-mute">Last round</span>
-            <span className="flex items-center gap-2 text-mute">
-              <span className="flex items-center gap-1"><Grid4 /> {last?.tile}</span>
-              <span className="font-medium text-white/90">{last?.winner}</span>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">{last?.solo ? "Solo" : "Split"}</span>
-              <span className="text-mute/70">›</span>
-            </span>
+            {live && roundShown <= 1 ? (
+              <span className="text-mute">No rounds settled yet</span>
+            ) : (
+              <span className="flex items-center gap-2 text-mute">
+                <span className="flex items-center gap-1"><Grid4 /> {live ? roundShown - 1 : last?.tile}</span>
+                {!live && <span className="font-medium text-white/90">{last?.winner}</span>}
+                {!live && <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink">{last?.solo ? "Solo" : "Split"}</span>}
+                <span className="text-mute/70">›</span>
+              </span>
+            )}
           </div>
 
           {mode === "pro" && (
