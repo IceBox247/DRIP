@@ -26,7 +26,7 @@ contract PonsAdapterTest is Test {
         drip.mint(address(curve), 1_000_000 ether); // curve's sellable supply
 
         vm.prank(owner);
-        adapter = new PonsSwapAdapter(owner);
+        adapter = new PonsSwapAdapter(owner, address(0xDEAD)); // poolManager unused in curve-only tests
         vm.prank(owner);
         adapter.setCurve(address(drip), address(curve));
 
@@ -65,11 +65,11 @@ contract PonsAdapterTest is Test {
         assertEq(usdg.balanceOf(address(adapter)), 0, "no dust left in adapter");
     }
 
-    function test_revertsWhenGraduated() public {
-        curve.setGraduated(true);
+    function test_graduatedWithNoV4RouteReverts() public {
+        curve.setGraduated(true); // curve done, no v4 pool registered -> no route
         vm.startPrank(game);
         usdg.approve(address(adapter), 100 * U);
-        vm.expectRevert(PonsSwapAdapter.Graduated.selector);
+        vm.expectRevert(PonsSwapAdapter.NoRoute.selector);
         adapter.swapExactIn(address(usdg), address(drip), 100 * U, 0);
         vm.stopPrank();
     }
@@ -77,7 +77,7 @@ contract PonsAdapterTest is Test {
     function test_revertsUnregisteredToken() public {
         vm.startPrank(game);
         usdg.approve(address(adapter), 100 * U);
-        vm.expectRevert(PonsSwapAdapter.NoCurve.selector);
+        vm.expectRevert(PonsSwapAdapter.NoRoute.selector);
         adapter.swapExactIn(address(usdg), address(0xBEEF), 100 * U, 0);
         vm.stopPrank();
     }
