@@ -38,6 +38,8 @@ export default function MinePage() {
   const [usdg, setUsdg] = useState(START_USDG);
   const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet claimed
   const [claimed, setClaimed] = useState(0); // refined DRIP, in wallet
+  const [showRewards, setShowRewards] = useState(false); // rewards/claim overlay
+  const [claimPct, setClaimPct] = useState(100);
   const [motherlode, setMotherlode] = useState(26);
   const [timeLeft, setTimeLeft] = useState<number>(gridMine.roundSeconds);
   const [round, setRound] = useState(397203);
@@ -125,10 +127,11 @@ export default function MinePage() {
     setTimeLeft(gridMine.roundSeconds);
   }, []);
 
-  const claim = () => {
-    if (unrefined <= 0) return;
-    setClaimed((c) => Math.round((c + unrefined * (1 - gridMine.refineFeeBps / 10000)) * 1e6) / 1e6);
-    setUnrefined(0);
+  const claim = (pct = 100) => {
+    const amt = (unrefined * pct) / 100;
+    if (amt <= 0) return;
+    setClaimed((c) => Math.round((c + amt * (1 - gridMine.refineFeeBps / 10000)) * 1e6) / 1e6);
+    setUnrefined((u) => Math.max(0, Math.round((u - amt) * 1e6) / 1e6));
   };
 
   // Populate the grid on the client (avoids an SSR/client hydration mismatch from Math.random).
@@ -295,6 +298,12 @@ export default function MinePage() {
             <Row label="PER ROUND">
               <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
             </Row>
+            <Row label="REWARDS">
+              <button onClick={() => setShowRewards(true)} className="flex items-center gap-1.5 font-semibold text-white">
+                <span className="flex items-center gap-1"><Drip /> {fmt(unrefined, 4)}</span>
+                <span className="text-mute/70">›</span>
+              </button>
+            </Row>
           </div>
 
           <button disabled={!canDeploy} onClick={deployNow}
@@ -327,9 +336,9 @@ export default function MinePage() {
             <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
           </div>
         </div>
-        <button onClick={claim} disabled={unrefined <= 0}
+        <button onClick={() => setShowRewards(true)} disabled={unrefined <= 0}
           className="mt-3 w-full rounded-xl bg-lime py-3 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-lime/30 disabled:text-ink/60">
-          {unrefined > 0 ? `Refine ${fmt(unrefined, 4)} DRIP → wallet (−10%)` : "Nothing to refine yet"}
+          {unrefined > 0 ? "Refine & claim" : "Nothing to refine yet"}
         </button>
         <div className="mt-2 text-center text-[11px] text-mute">Refining taxes 10% to holders who haven&rsquo;t claimed — hold longer, earn more.</div>
       </div>
@@ -356,6 +365,57 @@ export default function MinePage() {
       <p className="px-4 py-6 text-center text-[11px] text-mute/60">
         Demo · fake funds, no chain. A game of chance; not available where prohibited.
       </p>
+
+      {/* Rewards / claim overlay (ORE-style: pick a %, see the refining fee, claim). */}
+      {showRewards && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowRewards(false)}>
+          <div className="mx-auto w-full max-w-md rounded-t-3xl border-t border-line bg-ink px-5 pb-8 pt-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Rewards</h2>
+                <p className="text-sm text-mute">Refine your DRIP into your wallet.</p>
+              </div>
+              <button onClick={() => setShowRewards(false)} className="text-mute hover:text-white" aria-label="Close">✕</button>
+            </div>
+
+            <div className="mt-6 text-center text-6xl font-semibold text-white">{claimPct}%</div>
+
+            <div className="mt-6 grid grid-cols-4 gap-2">
+              {[25, 50, 75, 100].map((p) => (
+                <button key={p} onClick={() => setClaimPct(p)}
+                  className={`rounded-full py-3 text-sm font-semibold ${claimPct === p ? "bg-white text-ink" : "bg-panel text-white hover:bg-panel2"}`}>
+                  {p === 100 ? "MAX" : `${p}%`}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-3 text-sm">
+              <Row label="You receive">
+                <span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined * claimPct / 100 * (1 - gridMine.refineFeeBps / 10000), 4)}</span>
+              </Row>
+              <Row label={`Refining fee (${gridMine.refineFeeBps / 100}%)`}>
+                <span className="flex items-center gap-1 font-semibold text-mute"><Drip /> {fmt(unrefined * claimPct / 100 * (gridMine.refineFeeBps / 10000), 4)}</span>
+              </Row>
+            </div>
+
+            <button
+              onClick={() => { claim(claimPct); setShowRewards(false); }}
+              disabled={unrefined <= 0}
+              className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
+              {unrefined > 0 ? "Claim DRIP" : "Nothing to claim"}
+            </button>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-white">Balances</h3>
+              <div className="mt-3 space-y-3 text-sm">
+                <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(unrefined, 6)}</span></Row>
+                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {fmt(claimed, 6)}</span></Row>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AppChrome>
   );
 }
