@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { GridHero } from "@/components/GridHero";
+import { IntroExperience } from "@/components/IntroExperience";
 import { site } from "@/lib/site";
 
 // Landing — deliberately minimal (ORE-style): a hero, four one-line steps, and a way in.
@@ -17,6 +18,7 @@ const steps = [
 export default function Home() {
   return (
     <>
+      <IntroExperience />
       <Nav />
       <main>
         {/* Hero */}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { ReplayIntroButton } from "./IntroExperience";
 import { site } from "@/lib/site";
 
 const navLinks = [
@@ -29,7 +30,8 @@ export function Nav() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <ReplayIntroButton className="hidden text-sm font-semibold text-mute transition-colors hover:text-white sm:block" />
           <Link
             href={site.links.game}
             className="rounded-lg bg-lime px-4 py-2 text-sm font-semibold text-ink transition-transform hover:scale-[1.02] active:scale-100"
