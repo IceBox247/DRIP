@@ -13,6 +13,10 @@ export const robinhoodChain = defineChain({
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: { default: { http: [RPC] } },
   blockExplorers: { default: { name: "Blockscout", url: "https://robinhoodchain.blockscout.com" } },
+  // Multicall3 is deployed at the canonical address on Robinhood Chain — declaring it lets wagmi's
+  // useReadContracts batch dozens of reads (grid tiles, your stakes, history) into ONE call instead
+  // of one slow HTTP round-trip each. This is what makes the Mine screen load fast.
+  contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
 });
 
 // Deployed addresses. Default to the LIVE mainnet deployment (Grid Mine run #6) so the app works

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
-import { formatUnits, maxUint256, parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi } from "@/lib/contracts";
 import { compact } from "@/lib/format";
@@ -66,10 +66,10 @@ export default function StakePage() {
       if (tab === "deposit") {
         const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
         if (cur < amt) {
-          setMsg("Approve DRIP (one time)…");
+          setMsg("Approve DRIP…");
           const h = await writeContractAsync({
             address: addresses.drip as `0x${string}`, abi: erc20Abi, functionName: "approve",
-            args: [addresses.stake as `0x${string}`, maxUint256],
+            args: [addresses.stake as `0x${string}`, amt], // exact amount — avoids the "unlimited" wallet warning
           });
           setMsg("Waiting for approval…");
           if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h });

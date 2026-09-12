@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
-import { maxUint256, parseUnits } from "viem";
+import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi, ponsCurveAbi } from "@/lib/contracts";
 import { compact } from "@/lib/format";
@@ -84,8 +84,8 @@ export default function TradePage() {
       const token = dir === "buy" ? (addresses.usdg as `0x${string}`) : (addresses.drip as `0x${string}`);
       const allowance = (dir === "buy" ? usdgAllowance.data : dripAllowance.data) as bigint | undefined;
       if ((allowance ?? BigInt(0)) < inRaw) {
-        setMsg(`Approve ${fromTok} (one time)…`);
-        const h = await writeContractAsync({ address: token, abi: erc20Abi, functionName: "approve", args: [curveAddr, maxUint256] });
+        setMsg(`Approve ${fromTok}…`);
+        const h = await writeContractAsync({ address: token, abi: erc20Abi, functionName: "approve", args: [curveAddr, inRaw] }); // exact amount — no "unlimited" warning
         setMsg("Waiting for approval…");
         if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h });
       }

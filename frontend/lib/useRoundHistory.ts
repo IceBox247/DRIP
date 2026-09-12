@@ -47,7 +47,7 @@ export function useRoundHistory(enabled: boolean, currentRound: number, count = 
         const lo = Math.max(1, hi - count + 1);
         const nums: number[] = [];
         for (let r = hi; r >= lo; r--) nums.push(r);
-        const infos = await Promise.all(
+        const settled = await Promise.allSettled(
           nums.map(async (r) => {
             const g = (await client.readContract({ ...gm, functionName: "getRound", args: [BigInt(r)] })) as {
               status: number; winningTile: number; motherlodeHit: boolean; rewardsProcessed: boolean;
@@ -79,9 +79,11 @@ export function useRoundHistory(enabled: boolean, currentRound: number, count = 
             };
           })
         );
-        if (!cancelled) setRows(infos.filter((i) => i.status === 2));
+        // Keep the rounds that read successfully — a few flaky reads shouldn't blank the whole list.
+        const infos = settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+        if (!cancelled && infos.length > 0) setRows(infos.filter((i) => i.status === 2));
       } catch {
-        if (!cancelled) setRows([]);
+        // leave existing rows in place on total failure (don't blank what's already shown)
       } finally {
         if (!cancelled) setLoading(false);
       }

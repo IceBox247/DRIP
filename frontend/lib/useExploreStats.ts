@@ -63,42 +63,58 @@ export function useExploreStats(enabled: boolean): ExploreStats {
     let cancelled = false;
     const gm = { address: addresses.gridMine as `0x${string}`, abi: gridMineAbi } as const;
 
+    // Three INDEPENDENT sections. A failure in one (e.g. a flaky getLogs) must never zero the others,
+    // so each has its own try/catch and merges into state via a functional update.
     const load = async () => {
+      setState((s) => ({ ...s, loading: true }));
+      let cur = 0;
+
+      // 1) Direct live reads — the headline numbers. These are cheap and should almost always succeed.
       try {
-        setState((s) => ({ ...s, loading: true }));
-        // Direct live reads.
         const currentRound = (await client.readContract({ ...gm, functionName: "currentRound" })) as bigint;
+        cur = Number(currentRound);
         const motherlode = (await client.readContract({ ...gm, functionName: "motherlodeDrip" })) as bigint;
-        const totalStaked = addresses.stake
-          ? ((await client.readContract({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "totalStaked" })) as bigint)
-          : BigInt(0);
-        const totalSupply = addresses.drip
-          ? ((await client.readContract({ address: addresses.drip as `0x${string}`, abi: supplyAbi, functionName: "totalSupply" })) as bigint)
-          : BigInt(0);
+        let totalStaked = BigInt(0), totalSupply = BigInt(0);
+        try { if (addresses.stake) totalStaked = (await client.readContract({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "totalStaked" })) as bigint; } catch { /* keep 0 */ }
+        try { if (addresses.drip) totalSupply = (await client.readContract({ address: addresses.drip as `0x${string}`, abi: supplyAbi, functionName: "totalSupply" })) as bigint; } catch { /* keep 0 */ }
+        if (!cancelled) setState((s) => ({
+          ...s, loading: false,
+          roundsSettled: Math.max(0, cur - 1),
+          motherlode: Number(motherlode) / 1e18,
+          totalStaked: Number(totalStaked) / 1e18,
+          totalSupply: Number(totalSupply) / 1e18,
+        }));
+      } catch { if (!cancelled) setState((s) => ({ ...s, loading: false })); }
 
-        // Recent-rounds table (real settled rounds).
-        const cur = Number(currentRound);
-        const hi = cur - 1;
-        const lo = Math.max(1, hi - 19);
-        const activity: ActRound[] = [];
-        for (let r = hi; r >= lo; r--) {
-          const g = (await client.readContract({ ...gm, functionName: "getRound", args: [BigInt(r)] })) as {
-            status: number; winningTile: number; motherlodeHit: boolean; soloMode: boolean;
-            totalIn: bigint; winnerStake: bigint; winnerPotUsdg: bigint; rewardDrip: bigint;
-          };
-          if (g.status !== 2) continue;
-          activity.push({
-            round: r, winningTile: g.winningTile, hadWinner: g.winnerStake > BigInt(0),
-            motherlodeHit: g.motherlodeHit, soloMode: g.soloMode,
-            totalIn: Number(g.totalIn) / 1e6, winnerPotUsdg: Number(g.winnerPotUsdg) / 1e6,
-            rewardDrip: Number(g.rewardDrip) / 1e18,
-          });
-        }
+      // 2) Recent-rounds table (real settled rounds) — independent of the events scan.
+      if (cur > 1) {
+        try {
+          const hi = cur - 1;
+          const lo = Math.max(1, hi - 19);
+          const activity: ActRound[] = [];
+          for (let r = hi; r >= lo; r--) {
+            const g = (await client.readContract({ ...gm, functionName: "getRound", args: [BigInt(r)] })) as {
+              status: number; winningTile: number; motherlodeHit: boolean; soloMode: boolean;
+              totalIn: bigint; winnerStake: bigint; winnerPotUsdg: bigint; rewardDrip: bigint;
+            };
+            if (g.status !== 2) continue;
+            activity.push({
+              round: r, winningTile: g.winningTile, hadWinner: g.winnerStake > BigInt(0),
+              motherlodeHit: g.motherlodeHit, soloMode: g.soloMode,
+              totalIn: Number(g.totalIn) / 1e6, winnerPotUsdg: Number(g.winnerPotUsdg) / 1e6,
+              rewardDrip: Number(g.rewardDrip) / 1e18,
+            });
+          }
+          if (!cancelled) setState((s) => ({ ...s, activity, motherlodes: activity.filter((a) => a.motherlodeHit) }));
+        } catch { /* leave activity as-is */ }
+      }
 
-        // Deployed events over a bounded window (~3.5 days at 0.1s/block), chunked for the RPC.
+      // 3) Deployed events over a bounded window, chunked. If the RPC balks, we just skip these
+      //    event-derived stats — the headline numbers above still stand.
+      try {
         const latest = await client.getBlockNumber();
-        const MAX_SPAN = BigInt(3_000_000);
-        const CHUNK = BigInt(450_000);
+        const MAX_SPAN = BigInt(1_500_000); // ~42h at 0.1s/block — plenty, and only a few getLogs calls
+        const CHUNK = BigInt(500_000);
         const start = latest > MAX_SPAN ? latest - MAX_SPAN : BigInt(0);
         const agg: Record<string, { total: bigint; tiles: Set<number> }> = {};
         let deployedTotal = BigInt(0);
@@ -121,23 +137,8 @@ export function useExploreStats(enabled: boolean): ExploreStats {
           .map(([addr, v]) => ({ addr, total: Number(v.total) / 1e6, tiles: v.tiles.size }))
           .sort((a, b) => b.total - a.total)
           .slice(0, 10);
-
-        if (cancelled) return;
-        setState({
-          loading: false,
-          roundsSettled: Math.max(0, cur - 1),
-          motherlode: Number(motherlode) / 1e18,
-          totalStaked: Number(totalStaked) / 1e18,
-          totalSupply: Number(totalSupply) / 1e18,
-          deployedWindow: Number(deployedTotal) / 1e6,
-          uniqueMiners: Object.keys(agg).length,
-          miners,
-          activity,
-          motherlodes: activity.filter((a) => a.motherlodeHit),
-        });
-      } catch {
-        if (!cancelled) setState(EMPTY);
-      }
+        if (!cancelled) setState((s) => ({ ...s, deployedWindow: Number(deployedTotal) / 1e6, uniqueMiners: Object.keys(agg).length, miners }));
+      } catch { /* leave event-derived stats as-is */ }
     };
 
     load();

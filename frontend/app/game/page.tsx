@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
-import { parseUnits, maxUint256 } from "viem";
+import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
 import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
@@ -160,10 +160,12 @@ export default function MinePage() {
       // be mined so the deploy's gas estimate succeeds.
       const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
       if (cur < total) {
-        setTxMsg("Approve USDG (one time)…");
+        // Approve the EXACT amount (not unlimited) so wallets don't flag it as a "malicious / unlimited"
+        // approval. Costs one approval when your allowance runs low, but it's the safe, non-scary pattern.
+        setTxMsg("Approve USDG…");
         const approveHash = await writeContractAsync({
           address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
-          args: [addresses.gridMine as `0x${string}`, maxUint256],
+          args: [addresses.gridMine as `0x${string}`, total],
         });
         setTxMsg("Waiting for approval to confirm…");
         if (publicClient) await publicClient.waitForTransactionReceipt({ hash: approveHash });
@@ -395,16 +397,22 @@ export default function MinePage() {
       {/* When live and the round's window has elapsed, it just waits for the next deploy to roll it
           over automatically (the contract settles the finished round inside deployMany). ORE-style —
           no keeper, no "next round" button; deploying drives the game forward. */}
-      {live && timeShown === 0 && (
+      {/* Round ended → settles AUTOMATICALLY (keeper + lazy rollover on the next deploy). No manual
+          button for players. Only shown once real round data has loaded, so it never flashes "Round #0". */}
+      {live && chainReady && roundShown > 1 && timeShown === 0 && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
-          <div className="text-sm font-semibold text-white">Round #{roundShown} ended</div>
-          <div className="mt-0.5 text-[11px] text-mute">
-            Settle it to pick the winner, buy &amp; distribute DRIP/NVDA, and open the next round. (A keeper does this automatically for live players — this button drives it while testing.)
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="h-2 w-2 animate-ping rounded-full bg-lime" /> Round #{roundShown} ended — settling…
           </div>
-          <button onClick={settleAndProcess} disabled={settling}
-            className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink disabled:opacity-60">
-            {settling ? "Settling…" : "Settle round & pay winners"}
-          </button>
+          <div className="mt-1 text-[11px] text-mute">
+            The keeper is picking the winner, buying &amp; distributing DRIP/NVDA, and opening the next round — or just deploy again to jump into a fresh one.
+          </div>
+          {address?.toLowerCase() === "0xa30120ee727b2e540c41400ae4dd60e3b4572cbe" && (
+            <button onClick={settleAndProcess} disabled={settling}
+              className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 py-2 text-xs font-semibold text-lime disabled:opacity-60">
+              {settling ? "Settling…" : "Force settle now (admin)"}
+            </button>
+          )}
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
         </div>
       )}
