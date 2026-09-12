@@ -26,8 +26,10 @@ export default function ExplorePage() {
         <Grid>
           <Stat label="Rounds settled" value={fmt(s.roundsSettled)} sub="all-time" />
           <Stat label="Motherlode pool" value={`${compact(s.motherlode)} DRIP`} sub="current jackpot" />
+          <Stat label="DRIP supply" value={`${compact(s.totalSupply)} DRIP`} sub="in circulation" />
+          <Stat label="DRIP burnt" value={`${compact(s.burned)} DRIP`} sub="all-time — 70% of each cut" />
+          <Stat label="DRIP bonded" value={`${compact(s.bonded)} DRIP`} sub="in the Pons curve" />
           <Stat label="Entry fee" value={`${gridMine.adminFeeBps / 100}%`} sub="→ marketing/ops" />
-          <Stat label="DRIP supply" value={`${compact(s.totalSupply)} DRIP`} sub="fixed — never minted" />
         </Grid>
       </Section>
 

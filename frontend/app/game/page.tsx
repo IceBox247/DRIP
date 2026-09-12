@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
@@ -87,6 +87,15 @@ export default function MinePage() {
   });
   const [txMsg, setTxMsg] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
+  // Auto-mine: remember the chosen tiles + amount and re-deploy them every round, hands-off, for a set
+  // number of rounds. USDG is approved ONCE up front (exact, sized for all rounds), so after that each
+  // round only needs the quick deploy confirmation in the wallet.
+  const [autoMode, setAutoMode] = useState(false); // UI toggle → show the auto controls
+  const [autoRounds, setAutoRounds] = useState(10); // how many rounds to auto-mine
+  const [autoLeft, setAutoLeft] = useState(0); // rounds remaining (>0 = actively auto-mining)
+  const autoCfg = useRef<{ tiles: number[]; amount: number }>({ tiles: [], amount: 0 });
+  const lastAutoRound = useRef(0); // guard: at most one auto-deploy per round
+  const autoBusy = useRef(false); // guard: never overlap two auto-deploys
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -151,45 +160,89 @@ export default function MinePage() {
   // gas (it can't while the approve is pending — transferFrom would revert). We deliberately do NOT
   // force a big gas limit: wallets reserve gasLimit×maxFee up front, so a hardcoded 4M limit makes a
   // low-ETH wallet reject the tx ("insufficient ETH") even though the real fee is tiny.
-  const doDeploy = async () => {
-    if (!live) { deployNow(); return; }
-    if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return; }
-    if (targets.length === 0) { setTxMsg("Select at least one tile to deploy."); return; }
+  // Core on-chain deploy, shared by the manual button AND auto-mine. `coverRounds` sizes the (exact,
+  // never unlimited) USDG approval: auto-mine passes the full round count so it approves ONCE and every
+  // later round needs only the deploy signature. Returns true on a confirmed send.
+  const runDeploy = async (tileIdxs: number[], amt: number, coverRounds = 1): Promise<boolean> => {
+    if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return false; }
+    if (tileIdxs.length === 0) { setTxMsg("Select at least one tile to deploy."); return false; }
     try {
-      const perTile = parseUnits(String(amount), 6); // amount is per tile
-      if (perTile === BigInt(0)) { setTxMsg("Enter an amount greater than 0."); return; }
-      const n = BigInt(targets.length);
-      const total = perTile * n; // total USDG spent = per-tile × number of tiles
-      const tilesArg = targets.map((t) => t); // uint8[]
-      const amountsArg = targets.map(() => perTile); // uint256[] — same amount on each tile
-      // Approve once (max) only if the current allowance can't cover this deploy, then wait for it to
-      // be mined so the deploy's gas estimate succeeds.
+      const perTile = parseUnits(String(amt), 6); // amount is per tile
+      if (perTile === BigInt(0)) { setTxMsg("Enter an amount greater than 0."); return false; }
+      const total = perTile * BigInt(tileIdxs.length); // per round = per-tile × tiles
+      const need = total * BigInt(Math.max(1, coverRounds)); // approve enough to cover every planned round
+      const amountsArg = tileIdxs.map(() => perTile); // uint256[] — same amount on each tile
+      // Approve only if the current allowance can't cover what's needed; wait for it so the deploy's gas
+      // estimate succeeds. EXACT amount (not unlimited) so wallets never flag a "malicious" approval.
       const cur = (allowance.data as bigint | undefined) ?? BigInt(0);
-      if (cur < total) {
-        // Approve the EXACT amount (not unlimited) so wallets don't flag it as a "malicious / unlimited"
-        // approval. Costs one approval when your allowance runs low, but it's the safe, non-scary pattern.
+      if (cur < need) {
         setTxMsg("Approve USDG…");
         const approveHash = await writeContractAsync({
           address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
-          args: [addresses.gridMine as `0x${string}`, total],
+          args: [addresses.gridMine as `0x${string}`, need],
         });
         setTxMsg("Waiting for approval to confirm…");
         if (publicClient) await publicClient.waitForTransactionReceipt({ hash: approveHash });
         await allowance.refetch();
       }
-      setTxMsg(`Deploying to ${targets.length} tile${targets.length > 1 ? "s" : ""}…`);
+      setTxMsg(`Deploying to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""}…`);
       await writeContractAsync({
         address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany",
-        args: [tilesArg, amountsArg],
+        args: [tileIdxs, amountsArg],
         // No forced gas limit — the wallet estimates the real (small) fee, so low-ETH wallets work.
       });
-      setTxMsg(`Deployed on-chain to ${targets.length} tile${targets.length > 1 ? "s" : ""} ✓`);
-      setSelected([]);
+      setTxMsg(`Deployed on-chain to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""} ✓`);
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
+      return true;
     } catch (e) {
       setTxMsg(friendlyError(e, "Couldn't deploy — please try again."));
+      return false;
     }
   };
+  // Keep a live reference so the round-watcher effect never fires a stale closure.
+  const runDeployRef = useRef(runDeploy);
+  runDeployRef.current = runDeploy;
+
+  const doDeploy = async () => {
+    if (!live) { deployNow(); return; }
+    const ok = await runDeploy(targets, amount, 1);
+    if (ok) setSelected([]);
+  };
+
+  // Start auto-mining the current selection + amount for `autoRounds` rounds. The first deploy approves
+  // enough USDG for ALL of them, so the rest just re-deploy each round.
+  const startAuto = async () => {
+    if (!live) { setTxMsg("Auto-mine runs on-chain — not in demo."); return; }
+    if (!isConnected) { setTxMsg("Connect your wallet to auto-mine."); return; }
+    if (targets.length === 0) { setTxMsg("Select tiles first, then start auto-mine."); return; }
+    if (amount <= 0) { setTxMsg("Enter an amount first."); return; }
+    const cfg = { tiles: [...targets], amount };
+    autoCfg.current = cfg;
+    lastAutoRound.current = chain.round; // this round is the first of the run
+    const ok = await runDeploy(cfg.tiles, cfg.amount, autoRounds);
+    if (ok) { setSelected([]); setAutoLeft(Math.max(0, autoRounds - 1)); }
+  };
+  const stopAuto = () => { setAutoLeft(0); setTxMsg("Auto-mine stopped."); };
+
+  // Round-watcher: when a new round opens and auto-mine still has rounds left, re-deploy the saved
+  // config. Guards keep it to exactly one deploy per round and never overlapping.
+  useEffect(() => {
+    if (!live || !isConnected || autoLeft <= 0 || !chainReady) return;
+    const r = chain.round;
+    if (r <= 1 || r === lastAutoRound.current || autoBusy.current) return;
+    lastAutoRound.current = r;
+    autoBusy.current = true;
+    (async () => {
+      try {
+        const ok = await runDeployRef.current(autoCfg.current.tiles, autoCfg.current.amount, 1);
+        if (ok) setAutoLeft((n) => Math.max(0, n - 1));
+        else { setAutoLeft(0); setTxMsg("Auto-mine paused — a deploy didn't go through. Restart when ready."); }
+      } finally {
+        autoBusy.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain.round, autoLeft, live, isConnected, chainReady]);
 
   // Settle the finished round and process its rewards (the keeper's job — this button drives it while
   // testing): seed a fresh random word, closeRound() (picks the winner, opens the next round), then
@@ -474,6 +527,18 @@ export default function MinePage() {
             )}
           </button>
 
+          {/* One-tap select/clear for the whole grid, so you never have to tap 25 blocks by hand. */}
+          {mode === "pro" && (
+            <div className="mt-3 flex items-center justify-between px-4">
+              <span className="text-xs uppercase tracking-wide text-mute">{selected.length}/{N} blocks selected</span>
+              <button
+                onClick={() => setSelected(selected.length === N ? [] : Array.from({ length: N }, (_, i) => i))}
+                className="rounded-full bg-panel px-4 py-1.5 text-xs font-semibold text-white hover:bg-panel2">
+                {selected.length === N ? "Clear all" : "Select all blocks"}
+              </button>
+            </div>
+          )}
+
           {mode === "pro" && (
             <div className="grid grid-cols-5 gap-1.5 px-4 pt-3">
               {tilesShown.map((t, i) => {
@@ -564,7 +629,7 @@ export default function MinePage() {
                 </div>
               </Row>
             )}
-            <Row label="ROUNDS"><span className="font-semibold text-mute">1</span></Row>
+            <Row label="ROUNDS"><span className="font-semibold text-white">{autoLeft > 0 ? `${autoLeft} left` : autoMode ? autoRounds : 1}</span></Row>
             <Row label="PER TILE">
               <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
             </Row>
@@ -583,9 +648,64 @@ export default function MinePage() {
             </Row>
           </div>
 
-          <button disabled={!canDeploy} onClick={doDeploy}
-            className="mt-5 w-full rounded-2xl bg-lime py-4 text-base font-semibold text-ink transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute">
-            {live && !isConnected
+          {/* Auto-mine — set it up once and it re-deploys your tiles every round, hands-off. */}
+          {live && (
+            <div className="mt-5 rounded-2xl border border-line bg-panel/50 p-3.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-white">Auto-mine ⛏️</div>
+                  <div className="text-[11px] text-mute">Re-deploy your tiles every round automatically.</div>
+                </div>
+                <button role="switch" aria-checked={autoMode} aria-label="Toggle auto-mine"
+                  onClick={() => setAutoMode((v) => !v)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${autoMode ? "bg-lime" : "bg-panel2"}`}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${autoMode ? "left-[22px]" : "left-0.5"}`} />
+                </button>
+              </div>
+
+              {autoMode && autoLeft <= 0 && (
+                <>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wide text-mute">Rounds</span>
+                    <div className="flex items-center gap-1.5">
+                      {[5, 10, 25].map((n) => (
+                        <button key={n} onClick={() => setAutoRounds(n)}
+                          className={`rounded-lg px-3 py-1 text-xs font-semibold ${autoRounds === n ? "bg-white text-ink" : "bg-panel text-white hover:bg-panel2"}`}>{n}</button>
+                      ))}
+                      <input type="number" min={1} inputMode="numeric" value={autoRounds || ""}
+                        onChange={(e) => setAutoRounds(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                        aria-label="Number of rounds to auto-mine"
+                        className="w-14 rounded-lg bg-panel px-2 py-1 text-center text-xs font-semibold text-white focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[11px] leading-relaxed text-mute">
+                    Est. spend <span className="font-semibold text-white">{fmt(amount * Math.max(1, targets.length) * autoRounds, 2)} USDG</span> over {autoRounds} round{autoRounds > 1 ? "s" : ""} ({fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}/round). You approve USDG once; each round is a quick confirm in your wallet. Stops automatically after {autoRounds} round{autoRounds > 1 ? "s" : ""} or if funds run out.
+                  </div>
+                </>
+              )}
+
+              {autoLeft > 0 && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-lime/40 bg-lime/10 px-3 py-2 text-sm font-semibold text-white">
+                  <span className="h-2 w-2 animate-ping rounded-full bg-lime" />
+                  Auto-mining · {autoLeft} round{autoLeft > 1 ? "s" : ""} left
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            disabled={autoLeft > 0 ? false : !canDeploy}
+            onClick={autoLeft > 0 ? stopAuto : autoMode ? startAuto : doDeploy}
+            className={`mt-3 w-full rounded-2xl py-4 text-base font-semibold transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute ${autoLeft > 0 ? "border border-line bg-panel text-white" : "bg-lime text-ink"}`}>
+            {autoLeft > 0
+              ? `Stop auto-mine · ${autoLeft} left`
+              : autoMode
+              ? (live && !isConnected
+                  ? "Connect wallet to auto-mine"
+                  : mode === "pro" && selected.length === 0
+                  ? "Select tiles to auto-mine"
+                  : `Start auto-mine · ${autoRounds} round${autoRounds > 1 ? "s" : ""}`)
+              : live && !isConnected
               ? "Connect wallet to deploy"
               : mode === "pro" && selected.length === 0
               ? "Select tiles to deploy"

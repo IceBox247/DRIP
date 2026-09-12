@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePublicClient } from "wagmi";
-import { addresses, gridMineAbi } from "./contracts";
+import { addresses, gridMineAbi, ponsCurveAbi } from "./contracts";
+import { DRIP_MAX_SUPPLY } from "./site";
 import { readCache, writeCache } from "./cache";
 
 // Real Explore stats, read straight from the chain — no demo. Direct reads for the live figures
@@ -50,6 +51,8 @@ export type ExploreData = {
   motherlode: number; // DRIP
   totalStaked: number; // DRIP
   totalSupply: number; // DRIP
+  burned: number; // DRIP burnt all-time = genesis supply − current totalSupply
+  bonded: number; // DRIP held in the Pons bonding-curve reserve
   deployedWindow: number; // USDG over the scanned window
   uniqueMiners: number;
   miners: Miner[];
@@ -63,7 +66,7 @@ export type ExploreStats = ExploreData & {
 };
 
 const EMPTY: ExploreData = {
-  roundsSettled: 0, motherlode: 0, totalStaked: 0, totalSupply: 0,
+  roundsSettled: 0, motherlode: 0, totalStaked: 0, totalSupply: 0, burned: 0, bonded: 0,
   deployedWindow: 0, uniqueMiners: 0, miners: [], activity: [], motherlodes: [],
 };
 
@@ -103,6 +106,7 @@ export function useExploreStats(enabled: boolean): ExploreStats {
           { ...gm, functionName: "motherlodeDrip" },
           ...(addresses.stake ? [{ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "totalStaked" }] : []),
           ...(addresses.drip ? [{ address: addresses.drip as `0x${string}`, abi: supplyAbi, functionName: "totalSupply" }] : []),
+          ...(addresses.curve ? [{ address: addresses.curve as `0x${string}`, abi: ponsCurveAbi, functionName: "tokenReserve" }] : []),
         ];
         const res = await client.multicall({ contracts: calls as any, allowFailure: true });
         let i = 0;
@@ -110,13 +114,20 @@ export function useExploreStats(enabled: boolean): ExploreStats {
         const mlR = res[i++];
         const stakedR = addresses.stake ? res[i++] : undefined;
         const supplyR = addresses.drip ? res[i++] : undefined;
+        const bondedR = addresses.curve ? res[i++] : undefined;
 
         const patch: Partial<ExploreData> = {};
         if (roundR?.status === "success") { cur = Number(roundR.result as bigint); patch.roundsSettled = Math.max(0, cur - 1); }
         else { cur = data.roundsSettled + 1; } // fall back to cached rounds for the history window below
         if (mlR?.status === "success") patch.motherlode = Number(mlR.result as bigint) / 1e18;
         if (stakedR?.status === "success") patch.totalStaked = Number(stakedR.result as bigint) / 1e18;
-        if (supplyR?.status === "success") patch.totalSupply = Number(supplyR.result as bigint) / 1e18;
+        if (supplyR?.status === "success") {
+          const supply = Number(supplyR.result as bigint) / 1e18;
+          patch.totalSupply = supply;
+          // DRIP burnt all-time = genesis supply − what's still in existence (70% of every cut is burned).
+          patch.burned = Math.max(0, DRIP_MAX_SUPPLY - supply);
+        }
+        if (bondedR?.status === "success") patch.bonded = Number(bondedR.result as bigint) / 1e18;
         merge(patch);
         if (!cancelled) setStale(false); // we have a live read this session now
       } catch {

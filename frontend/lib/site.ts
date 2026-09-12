@@ -47,7 +47,14 @@ export const gridMine = {
   refineFeeBps: 1000, // 10% claim tax on DRIP → unclaimed holders
   winnerStockAsset: "NVDA", // tokenized NVIDIA on Robinhood Chain
   nvdaPrice: 176, // demo NVDA price in USDG (display only)
+  // DRIP's fixed genesis supply (never minted). 70% of every round's cut buys DRIP and BURNS it, so
+  // "DRIP burnt" (Explore) = this − current on-chain totalSupply. If the real genesis differs, fix it
+  // here (or set NEXT_PUBLIC_DRIP_MAX_SUPPLY) — the burn stat is derived straight from it.
+  dripMaxSupply: 1_000_000_000,
 } as const;
+
+/** DRIP genesis supply — env override wins, else the 1B default above. Used to derive "DRIP burnt". */
+export const DRIP_MAX_SUPPLY = Number(process.env.NEXT_PUBLIC_DRIP_MAX_SUPPLY) || gridMine.dripMaxSupply;
 
 export const stats = [
   { value: "0%", label: "team allocation", note: "fair launch — team holds no tokens" },
