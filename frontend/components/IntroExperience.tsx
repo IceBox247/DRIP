@@ -126,9 +126,9 @@ export function IntroExperience() {
         </div>
       </div>
 
-      {/* Scene stage — padded to clear the fixed top/bottom bars. */}
-      <div className="relative z-[5] flex h-full items-center justify-center px-5 py-24">
-        <div className="w-full max-w-content">
+      {/* Scene stage — one narrow, centered column; padded to clear the fixed bars. */}
+      <div className="relative z-[5] flex h-full items-center justify-center px-6 py-24">
+        <div className="mx-auto w-full max-w-md">
           {scene === 0 && <SceneOpen />}
           {scene === 1 && <SceneMechanism />}
           {scene === 2 && <SceneEconomics />}
@@ -182,16 +182,16 @@ function SceneOpen() {
   }, []);
   return (
     <div className="text-center">
-      <div className="rise rise-1 mb-6 inline-flex items-center gap-2 rounded border border-line bg-white/[0.03] px-3 py-1 font-mono text-[11px] text-mute">
+      <div className="rise rise-1 mb-7 inline-flex items-center gap-2 rounded border border-line bg-white/[0.03] px-3 py-1 font-mono text-[11px] text-mute">
         <span className="h-1.5 w-1.5 rounded-full bg-lime" /> DIG&nbsp;#{dig} · SEALING
       </div>
-      <h1 className="rise rise-1 text-6xl font-bold tracking-tight text-white sm:text-8xl">DRIP</h1>
-      <div className="rise rise-2 mx-auto mt-4 h-px w-24 bg-lime/70" />
-      <p className="rise rise-2 mt-5 text-lg text-mute sm:text-2xl">
-        Mine tokenized stock. <span className="text-white">Block by block.</span>
+      <h1 className="rise rise-1 text-6xl font-bold tracking-tight text-white">DRIP</h1>
+      <div className="rise rise-2 mx-auto mt-4 h-px w-16 bg-lime/70" />
+      <p className="rise rise-2 mt-5 text-lg text-white">
+        Mine tokenized stock. <span className="text-mute">Block by block.</span>
       </p>
-      <p className="rise rise-3 mt-3 font-mono text-xs text-mute/70">
-        Provably-fair · nothing minted · the team holds zero
+      <p className="rise rise-3 mt-4 font-mono text-[11px] leading-relaxed text-mute/70">
+        Provably-fair · nothing minted · team holds zero
       </p>
     </div>
   );
@@ -203,20 +203,14 @@ function SceneMechanism() {
   const [winner, setWinner] = useState(12);
   const [dig, setDig] = useState(1041);
   const [phase, setPhase] = useState<"mining" | "struck">("mining");
-  const [hash, setHash] = useState("0x9a4f…c3e1");
   const amounts = useMemo(() => Array.from({ length: N }, () => Math.round(5 + Math.random() * 95)), []);
   const haul = useMemo(() => amounts.reduce((a, b) => a + b, 0), [amounts]);
 
   useEffect(() => {
     let alive = true;
-    const rndHash = () => {
-      const h = "0123456789abcdef";
-      const p = (n: number) => Array.from({ length: n }, () => h[Math.floor(Math.random() * 16)]).join("");
-      return `0x${p(4)}…${p(4)}`;
-    };
     const cycle = () => {
       setPhase("mining");
-      setTimeout(() => { if (!alive) return; setWinner(Math.floor(Math.random() * N)); setPhase("struck"); setHash(rndHash()); }, 1700);
+      setTimeout(() => { if (!alive) return; setWinner(Math.floor(Math.random() * N)); setPhase("struck"); }, 1700);
       setTimeout(() => { if (!alive) return; setDig((d) => d + 1); }, 3000);
     };
     cycle();
@@ -225,27 +219,17 @@ function SceneMechanism() {
   }, []);
 
   return (
-    <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-10">
-      <div className="order-2 text-center lg:order-1 lg:text-left">
-        <p className="rise rise-1 font-mono text-[11px] uppercase tracking-[0.25em] text-lime sm:text-xs">The mechanism</p>
-        <h2 className="rise rise-2 mt-3 text-2xl font-semibold leading-tight text-white sm:text-5xl">
-          25 blocks. One strikes.<br />Every 60 seconds.
-        </h2>
-        <p className="rise rise-3 mx-auto mt-4 max-w-md text-sm leading-relaxed text-mute sm:text-base lg:mx-0">
-          Stake USDG on the blocks you back. When the dig seals, on-chain randomness marks one block —
-          its miners split the haul, pro-rata.
-        </p>
-        <div className="rise rise-4 mt-5 inline-flex items-center gap-2.5 rounded border border-line bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] text-mute sm:text-[11px]">
-          <span className={`h-1.5 w-1.5 rounded-full ${phase === "struck" ? "bg-lime" : "bg-mute animate-pulseDot"}`} />
-          {phase === "struck" ? `SEALED ${hash}` : "SEALING…"} · dig #{dig}
-        </div>
-      </div>
+    <div className="text-center">
+      <p className="rise rise-1 font-mono text-[11px] uppercase tracking-[0.25em] text-lime">The mechanism</p>
+      <h2 className="rise rise-1 mx-auto mt-3 max-w-xs text-2xl font-semibold leading-snug text-white">
+        25 blocks. One strikes.
+      </h2>
 
-      <div className="order-1 mx-auto w-full max-w-[248px] lg:order-2 lg:max-w-sm">
-        <div className="rounded-xl border border-line bg-panel/50 p-3 backdrop-blur sm:p-5">
-          <div className="mb-2.5 flex items-center justify-between font-mono text-[10px] text-mute sm:text-[11px]">
+      <div className="rise rise-2 mx-auto mt-6 w-full max-w-[260px]">
+        <div className="rounded-xl border border-line bg-panel/40 p-3 backdrop-blur">
+          <div className="mb-2.5 flex items-center justify-between font-mono text-[10px] text-mute">
             <span>HAUL {haul} USDG</span>
-            <span>25 blocks · 60s</span>
+            <span>dig #{dig}</span>
           </div>
           <div className="grid grid-cols-5 gap-1" aria-hidden="true">
             {amounts.map((amt, i) => {
@@ -253,26 +237,29 @@ function SceneMechanism() {
               return (
                 <div
                   key={i}
-                  className={`relative aspect-square rounded-md border text-[9px] leading-none transition-all duration-500 ${
-                    isWin ? "flare border-lime bg-lime/25 scale-[1.05]" : "border-line/80 bg-ink/70"
+                  className={`relative aspect-square rounded-md border transition-all duration-500 ${
+                    isWin ? "flare border-lime bg-lime/25 scale-[1.06]" : "border-line/70 bg-ink/70"
                   }`}
                 >
-                  <div className="flex h-full flex-col justify-between p-1">
-                    <span className="text-mute/45">#{i}</span>
-                    <span className={isWin ? "font-semibold text-lime" : "text-mute/60"}>{amt}</span>
+                  <div className="flex h-full items-center justify-center">
+                    <span className={`text-[9px] leading-none ${isWin ? "font-semibold text-lime" : "text-mute/45"}`}>{amt}</span>
                   </div>
                 </div>
               );
             })}
           </div>
-          <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-3 font-mono text-[11px]">
-            <span className="text-mute">struck block</span>
-            <span className={`transition-colors ${phase === "struck" ? "text-lime" : "text-mute/50"}`}>
-              {phase === "struck" ? `#${winner} · haul → miners` : "————"}
+          <div className="mt-2.5 flex items-center justify-center gap-2 border-t border-line/60 pt-2.5 font-mono text-[10px]">
+            <span className={`h-1.5 w-1.5 rounded-full ${phase === "struck" ? "bg-lime" : "bg-mute animate-pulseDot"}`} />
+            <span className={phase === "struck" ? "text-lime" : "text-mute/60"}>
+              {phase === "struck" ? `block #${winner} struck · haul → miners` : "sealing the dig…"}
             </span>
           </div>
         </div>
       </div>
+
+      <p className="rise rise-3 mx-auto mt-6 max-w-xs text-sm leading-relaxed text-mute">
+        Stake on the blocks you back. One is marked by on-chain randomness — its miners split the haul.
+      </p>
     </div>
   );
 }
@@ -288,35 +275,31 @@ function SceneEconomics() {
     { pct: gridMine.cutSplitMotherlodeBps / 100, label: "Motherlode", desc: `1-in-${gridMine.motherlodeOdds} pays it all out`, color: "#e6b45f" },
   ];
   return (
-    <div className="mx-auto max-w-2xl text-center">
-      <p className="rise rise-1 font-mono text-xs uppercase tracking-[0.25em] text-lime">The economics</p>
-      <h2 className="rise rise-2 mt-4 text-3xl font-semibold leading-tight text-white sm:text-4xl">
-        Every dig, a 10% cut buys DRIP —<br className="hidden sm:block" /> and splits five ways.
+    <div className="text-center">
+      <p className="rise rise-1 font-mono text-[11px] uppercase tracking-[0.25em] text-lime">The economics</p>
+      <h2 className="rise rise-1 mx-auto mt-3 max-w-sm text-2xl font-semibold leading-snug text-white">
+        Every dig, a 10% cut buys DRIP.
       </h2>
 
       {/* One honest stacked bar of where the cut goes. */}
-      <div className="rise rise-3 mt-8 flex h-3 w-full overflow-hidden rounded-full border border-line">
+      <div className="rise rise-2 mt-7 flex h-2.5 w-full overflow-hidden rounded-full border border-line">
         {parts.map((p) => (
           <div key={p.label} style={{ width: `${p.pct}%`, background: p.color }} className="h-full" title={`${p.label} ${p.pct}%`} />
         ))}
       </div>
 
-      <div className="rise rise-4 mt-6 grid gap-x-6 gap-y-3 text-left sm:grid-cols-2">
+      <div className="rise rise-3 mt-6 space-y-2.5 text-left">
         {parts.map((p) => (
-          <div key={p.label} className="flex items-baseline gap-3">
-            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: p.color }} />
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-sm font-semibold text-white">{p.pct}%</span>
-                <span className="text-sm font-medium text-white">{p.label}</span>
-              </div>
-              <div className="text-xs text-mute">{p.desc}</div>
-            </div>
+          <div key={p.label} className="flex items-center gap-3">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: p.color }} />
+            <span className="w-9 shrink-0 font-mono text-sm font-semibold text-white">{p.pct}%</span>
+            <span className="text-sm font-medium text-white">{p.label}</span>
+            <span className="ml-auto truncate text-xs text-mute">{p.desc}</span>
           </div>
         ))}
       </div>
-      <p className="rise rise-4 mt-7 font-mono text-xs text-mute/70">
-        No emissions. Every DRIP paid out was bought on-chain from real trading flow.
+      <p className="rise rise-4 mt-7 font-mono text-[11px] leading-relaxed text-mute/70">
+        No emissions — every DRIP paid out was bought on-chain.
       </p>
     </div>
   );
@@ -326,17 +309,15 @@ function SceneEconomics() {
 function SceneEnter({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="text-center">
-      <p className="rise rise-1 font-mono text-xs uppercase tracking-[0.25em] text-lime">Start mining</p>
-      <h2 className="rise rise-2 mx-auto mt-4 max-w-3xl text-4xl font-bold leading-tight text-white sm:text-6xl">
+      <p className="rise rise-1 font-mono text-[11px] uppercase tracking-[0.25em] text-lime">Start mining</p>
+      <h2 className="rise rise-1 mx-auto mt-4 max-w-sm text-3xl font-bold leading-tight text-white">
         Mine block after block.
-        <br />
-        A new dig every 60 seconds.
       </h2>
-      <p className="rise rise-3 mx-auto mt-5 max-w-md text-base text-mute">
-        Connect your wallet, stake on a block, and harvest what you mine — in seconds. No sign-ups, no
-        custody. You hold your keys the whole way.
+      <p className="rise rise-2 mx-auto mt-4 max-w-xs text-sm leading-relaxed text-mute">
+        Connect, stake on a block, and harvest what you mine — in seconds. No sign-ups, no custody. You
+        hold your keys the whole way.
       </p>
-      <div className="rise rise-4 mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <div className="rise rise-3 mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
         <Link
           href={site.links.game}
           onClick={onEnter}
