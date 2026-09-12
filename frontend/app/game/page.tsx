@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useDisconnect, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
@@ -45,7 +45,9 @@ const MINERS = [
 ];
 
 export default function MinePage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
+  const { disconnect } = useDisconnect();
+  const [showSettings, setShowSettings] = useState(false);
   // Live on-chain round reads only need the RPC, not a wallet — so visitors see the REAL round before
   // connecting; a wallet is only required to actually deploy. Falls back to the demo only when the
   // contracts aren't configured or the chain isn't reachable.
@@ -140,6 +142,7 @@ export default function MinePage() {
   // never stuck inside the Rewards/History sheet on Android.
   useBackClose(showRewards, () => setShowRewards(false));
   useBackClose(showHistory, () => setShowHistory(false));
+  useBackClose(showSettings, () => setShowSettings(false));
 
   const pool = useMemo(() => tiles.reduce((s, t) => s + t.mine + t.others, 0), [tiles]);
   const targets = mode === "lite" ? Array.from({ length: N }, (_, i) => i) : selected;
@@ -572,7 +575,7 @@ export default function MinePage() {
       {liveWin && !revealing && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-center">
           <div className="text-sm font-semibold text-white">
-            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "🎉 "}Block #{liveWin.tile} won round #{liveWin.round}
+            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "⛏️ "}Block #{liveWin.tile} struck · round #{liveWin.round}
           </div>
           <div className="mt-0.5 text-[11px] text-mute">A fresh round is live — deploy to jump in.</div>
         </div>
@@ -580,7 +583,7 @@ export default function MinePage() {
 
       {result && (
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
-          <div className="font-semibold text-white">Round #{round} — block {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
+          <div className="font-semibold text-white">Round #{round} — block {result.tile} struck{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
           <div className="mt-1">
             {result.won ? (
               <>
@@ -592,7 +595,7 @@ export default function MinePage() {
                   : ` · +${fmt(result.drip, 3)} DRIP · +${fmt(result.nvda, 4)} NVDA`}
               </>
             ) : (
-              "You had no stake on the winning block."
+              "You weren't mining the block that struck."
             )}
           </div>
           <button onClick={nextRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">Next round now</button>
@@ -648,7 +651,7 @@ export default function MinePage() {
                         : sel ? "border-white ring-1 ring-white/60"
                         : "border-line bg-panel/40 hover:border-mute/50"
                     } ${t.mine > 0 && !lit && !won ? "bg-lime/5" : ""} ${revealing && !lit ? "opacity-50" : ""}`}>
-                    {won && <span className="absolute right-1 top-1 text-xs">🏆</span>}
+                    {won && <span className="absolute right-1 top-1 text-xs">⛏️</span>}
                     {!live && sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
                     {/* Your own stake on this tile (top) — shown above the tile's total (bottom), like ORE. */}
                     {t.mine > 0 && (
@@ -676,7 +679,7 @@ export default function MinePage() {
                 </button>
               ))}
             </div>
-            <button aria-label="Settings" className="absolute right-4 text-mute transition-colors hover:text-white">
+            <button aria-label="Settings" onClick={() => setShowSettings(true)} className="absolute right-4 text-mute transition-colors hover:text-white">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -892,7 +895,7 @@ export default function MinePage() {
         {/* Nothing to harvest right now (live) — a friendly note so the section isn't just balances. */}
         {live && pending.rounds.length === 0 && (
           <div className="mt-3 rounded-xl border border-line bg-ink/40 px-3 py-2.5 text-center text-[11px] text-mute">
-            No unclaimed winnings. Win a round (stake on the winning block) and it&rsquo;ll show here to harvest.
+            No unclaimed rewards yet. Mine the block that strikes (stake on it) and it&rsquo;ll show here to harvest.
           </div>
         )}
         <button onClick={() => (live ? doRefine(100) : setShowRewards(true))} disabled={unrefinedShown <= 0}
@@ -971,13 +974,13 @@ export default function MinePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
                       Round #{r.round}
-                      {r.youWon && <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink">YOU WON</span>}
+                      {r.youWon && <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink">YOU MINED</span>}
                       {r.motherlodeHit && <span className="rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-bold text-ink">🎰 MOTHERLODE</span>}
                     </div>
                     <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-ink">{r.hadWinner ? (r.soloMode ? "Solo" : "Split") : "No winner"}</span>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 text-[11px] text-mute">
-                    <span className="flex items-center gap-1"><Grid4 /> block {r.winningTile} won</span>
+                    <span className="flex items-center gap-1"><Grid4 /> block {r.winningTile} struck</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1 text-mute">pool <span className="font-semibold text-white"><Usdg /> {fmt(r.totalIn, 2)}</span></span>
@@ -1060,6 +1063,76 @@ export default function MinePage() {
             {/* Always-reachable exit at the bottom of the sheet (in addition to the sticky ✕ and Back). */}
             <button onClick={() => setShowRewards(false)}
               className="mt-3 w-full rounded-2xl border border-line py-3.5 text-sm font-semibold text-mute hover:text-white">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings sheet — opened by the gear next to Lite/Pro. Real, useful controls: network, wallet,
+          and a data refresh (clears the on-chain read cache and reloads if a value ever looks stuck). */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowSettings(false)}>
+          <div className="mx-auto w-full max-w-md rounded-t-3xl border-t border-line bg-ink px-5 pb-8 pt-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold tracking-tight text-white">Settings</h2>
+              <button onClick={() => setShowSettings(false)} aria-label="Close"
+                className="grid h-9 w-9 place-items-center rounded-full border border-line text-mute hover:text-white">✕</button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {/* Network */}
+              <div className="flex items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">Network</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-mute">
+                    <span className={`h-1.5 w-1.5 rounded-full ${isConnected && chainId === CHAIN_ID ? "bg-lime" : "bg-yellow-500"}`} />
+                    {!isConnected ? "Wallet not connected" : chainId === CHAIN_ID ? robinhoodChain.name : "Wrong network"}
+                  </div>
+                </div>
+                {isConnected && chainId !== CHAIN_ID && (
+                  <button onClick={() => ensureChain()}
+                    className="rounded-lg bg-lime px-3 py-1.5 text-xs font-semibold text-ink">Switch</button>
+                )}
+              </div>
+
+              {/* Wallet */}
+              <div className="flex items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-white">Wallet</div>
+                  <div className="mt-0.5 font-mono text-[11px] text-mute">{isConnected && address ? short(address) : "Not connected"}</div>
+                </div>
+                {isConnected && (
+                  <button onClick={() => { disconnect(); setShowSettings(false); }}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-mute hover:text-white">Disconnect</button>
+                )}
+              </div>
+
+              {/* Refresh data — clears the local read cache and reloads (for when a value looks stuck). */}
+              <button
+                onClick={() => {
+                  try {
+                    for (let i = localStorage.length - 1; i >= 0; i--) {
+                      const k = localStorage.key(i);
+                      if (k && k.startsWith("drip.cache.")) localStorage.removeItem(k);
+                    }
+                  } catch { /* ignore */ }
+                  chain.refetch();
+                  if (typeof window !== "undefined") window.location.reload();
+                }}
+                className="w-full rounded-xl border border-line bg-panel/60 px-4 py-3 text-left">
+                <div className="text-sm font-semibold text-white">Refresh data</div>
+                <div className="mt-0.5 text-[11px] text-mute">Clears the cached on-chain reads and reloads the latest.</div>
+              </button>
+            </div>
+
+            <div className="mt-4 text-center text-[11px] text-mute/60">
+              Round {roundShown} · {gridMine.tiles} blocks · {gridMine.roundSeconds}s
+            </div>
+
+            <button onClick={() => setShowSettings(false)}
+              className="mt-4 w-full rounded-2xl border border-line py-3.5 text-sm font-semibold text-mute hover:text-white">
               Close
             </button>
           </div>
