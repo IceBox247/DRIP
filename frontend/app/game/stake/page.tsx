@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
-import { addresses, contractsReady, erc20Abi } from "@/lib/contracts";
+import { addresses, contractsReady, erc20Abi, robinhoodChain, CHAIN_ID } from "@/lib/contracts";
+import { useEnsureChain } from "@/lib/useEnsureChain";
 import { compact, friendlyError } from "@/lib/format";
 
 // Stake — REAL stake-to-earn against StakeVault on Robinhood Chain. Stake DRIP, earn the 10% stakers'
@@ -27,6 +28,7 @@ export default function StakePage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const ensureChain = useEnsureChain();
   const ready = contractsReady && !!addresses.stake && !!addresses.drip;
 
   const [tab, setTab] = useState<"deposit" | "withdraw">("deposit");
@@ -60,6 +62,7 @@ export default function StakePage() {
     if (!ready) return;
     if (!isConnected) { setMsg("Connect your wallet first."); return; }
     if (amount <= 0) { setMsg("Enter an amount."); return; }
+    if (!(await ensureChain())) { setMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     setBusy(true); setMsg(null);
     try {
       const amt = parseUnits(String(amount), 18);
@@ -69,17 +72,17 @@ export default function StakePage() {
           setMsg("Approve DRIP…");
           const h = await writeContractAsync({
             address: addresses.drip as `0x${string}`, abi: erc20Abi, functionName: "approve",
-            args: [addresses.stake as `0x${string}`, amt], // exact amount — avoids the "unlimited" wallet warning
+            args: [addresses.stake as `0x${string}`, amt], chainId: CHAIN_ID, // exact amount — avoids the "unlimited" wallet warning
           });
           setMsg("Waiting for approval…");
-          if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h });
+          try { if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h, timeout: 90_000, pollingInterval: 1_500 }); } catch { /* slow RPC — stake below reverts if approval truly missing */ }
         }
         setMsg("Staking…");
-        await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "stake", args: [amt] });
+        await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "stake", args: [amt], chainId: CHAIN_ID });
         setMsg("Staked ✓");
       } else {
         setMsg("Withdrawing…");
-        await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "withdraw", args: [amt] });
+        await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "withdraw", args: [amt], chainId: CHAIN_ID });
         setMsg("Withdrawn ✓");
       }
       setAmount(0);
@@ -93,10 +96,11 @@ export default function StakePage() {
 
   const claim = async () => {
     if (!ready || !isConnected || earnedShown <= 0) return;
+    if (!(await ensureChain())) { setMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     setBusy(true); setMsg(null);
     try {
       setMsg("Claiming rewards…");
-      await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "getReward" });
+      await writeContractAsync({ address: addresses.stake as `0x${string}`, abi: stakeAbi, functionName: "getReward", chainId: CHAIN_ID });
       setMsg("Rewards claimed ✓");
       setTimeout(refetch, 3000);
     } catch (e) {

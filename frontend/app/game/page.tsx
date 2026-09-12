@@ -5,7 +5,8 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
-import { addresses, contractsReady, gridMineAbi, erc20Abi } from "@/lib/contracts";
+import { addresses, contractsReady, gridMineAbi, erc20Abi, robinhoodChain, CHAIN_ID } from "@/lib/contracts";
+import { useEnsureChain } from "@/lib/useEnsureChain";
 import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
@@ -61,6 +62,7 @@ export default function MinePage() {
   const history = useRoundHistory(live && showHistory, chain.round);
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
+  const ensureChain = useEnsureChain(); // force the wallet onto Robinhood Chain before any tx
   // Current USDG allowance for GridMine — so we only approve once (max), not every round.
   const allowance = useReadContract({
     address: (addresses.usdg || undefined) as `0x${string}` | undefined,
@@ -100,6 +102,18 @@ export default function MinePage() {
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
   const [amount, setAmount] = useState(10);
+  // Separate string state for the amount box so intermediate decimals ("", ".", "0.", ".5") survive
+  // typing — a plain number input converted straight to Number() drops the "." and can't be typed.
+  const [amountStr, setAmountStr] = useState("10");
+  const setAmt = useCallback((n: number) => { const v = Math.max(0, n); setAmount(v); setAmountStr(v ? String(v) : ""); }, []);
+  const onAmountText = useCallback((raw: string) => {
+    let s = raw.replace(/[^0-9.]/g, ""); // digits + dots only
+    const dot = s.indexOf(".");
+    if (dot !== -1) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, ""); // keep just the first dot
+    setAmountStr(s);
+    const n = parseFloat(s);
+    setAmount(isFinite(n) ? n : 0);
+  }, []);
   const [usdg, setUsdg] = useState(START_USDG);
   const [unrefined, setUnrefined] = useState(0); // DRIP won this round(s), not yet refined
   const [claimed, setClaimed] = useState(0); // refined DRIP, in wallet
@@ -166,6 +180,8 @@ export default function MinePage() {
   const runDeploy = async (tileIdxs: number[], amt: number, coverRounds = 1): Promise<boolean> => {
     if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return false; }
     if (tileIdxs.length === 0) { setTxMsg("Select at least one tile to deploy."); return false; }
+    // Make sure the wallet is on Robinhood Chain, or the tx would go to (and cost gas on) the wrong network.
+    if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return false; }
     try {
       const perTile = parseUnits(String(amt), 6); // amount is per tile
       if (perTile === BigInt(0)) { setTxMsg("Enter an amount greater than 0."); return false; }
@@ -179,16 +195,27 @@ export default function MinePage() {
         setTxMsg("Approve USDG…");
         const approveHash = await writeContractAsync({
           address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
-          args: [addresses.gridMine as `0x${string}`, need],
+          args: [addresses.gridMine as `0x${string}`, need], chainId: CHAIN_ID,
         });
         setTxMsg("Waiting for approval to confirm…");
-        if (publicClient) await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        // Tolerate a slow RPC: if the receipt poll times out, verify via the allowance instead of failing.
+        try {
+          if (publicClient) await publicClient.waitForTransactionReceipt({ hash: approveHash, timeout: 90_000, pollingInterval: 1_500 });
+        } catch { /* fall through to the allowance re-check below */ }
+        let confirmed = cur;
+        try {
+          if (publicClient && address) confirmed = (await publicClient.readContract({
+            address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "allowance",
+            args: [address, addresses.gridMine as `0x${string}`],
+          })) as bigint;
+        } catch { /* keep prior value */ }
         await allowance.refetch();
+        if (confirmed < need) { setTxMsg("Approval is still pending — give it a few seconds, then tap Deploy again."); return false; }
       }
       setTxMsg(`Deploying to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""}…`);
       await writeContractAsync({
         address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany",
-        args: [tileIdxs, amountsArg],
+        args: [tileIdxs, amountsArg], chainId: CHAIN_ID,
         // No forced gas limit — the wallet estimates the real (small) fee, so low-ETH wallets work.
       });
       setTxMsg(`Deployed on-chain to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""} ✓`);
@@ -250,6 +277,7 @@ export default function MinePage() {
   const settleAndProcess = async () => {
     if (!live || settling) return;
     if (!isConnected) { setTxMsg("Connect your wallet to settle."); return; }
+    if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     setSettling(true);
     const settled = chain.round; // the open, expired round that will close
     try {
@@ -280,6 +308,7 @@ export default function MinePage() {
   // NVDA sent to the wallet once rewards are processed).
   const harvest = async (round: number) => {
     if (!isConnected || !round) return;
+    if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     try {
       setTxMsg(`Harvesting round #${round}…`);
       await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(round)], gas: BigInt(400000) });
@@ -294,6 +323,7 @@ export default function MinePage() {
   // latest). USDG & NVDA land in your wallet; DRIP moves to "unrefined" (refine it below to claim).
   const harvestAll = async () => {
     if (!isConnected || pending.rounds.length === 0) return;
+    if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     const roundsToDo = pending.rounds.map((r) => r.round);
     for (let i = 0; i < roundsToDo.length; i++) {
       const r = roundsToDo[i];
@@ -314,6 +344,7 @@ export default function MinePage() {
   const doRefine = async (pct: number) => {
     if (!live) { claim(pct); setShowRewards(false); return; }
     if (!isConnected) { setTxMsg("Connect your wallet to refine."); return; }
+    if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     const claimable = refiningClaimable.data as bigint | undefined;
     if (!claimable || claimable === BigInt(0)) { setTxMsg("Nothing to refine yet."); return; }
     const amt = (claimable * BigInt(pct)) / BigInt(100);
@@ -604,15 +635,13 @@ export default function MinePage() {
               <Usdg big />
               <input
                 id="deploy-amount"
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min={0}
-                step="any"
-                value={amount || ""}
-                onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
+                value={amountStr}
+                onChange={(e) => onAmountText(e.target.value)}
                 placeholder="0"
                 aria-label="Amount of USDG to add per block"
-                className="w-full min-w-0 bg-transparent text-center text-5xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-full min-w-0 bg-transparent text-center text-5xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none"
               />
               {/* Pencil affordance so it's unmistakably editable. */}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
@@ -624,10 +653,10 @@ export default function MinePage() {
           </div>
           <div className="mt-5 grid grid-cols-4 gap-2">
             {[
-              { l: "+1", f: () => setAmount((a) => a + 1) },
-              { l: "+10", f: () => setAmount((a) => a + 10) },
-              { l: "+100", f: () => setAmount((a) => a + 100) },
-              { l: "MAX", f: () => setAmount(Math.floor(usdg)) },
+              { l: "+1", f: () => setAmt(amount + 1) },
+              { l: "+10", f: () => setAmt(amount + 10) },
+              { l: "+100", f: () => setAmt(amount + 100) },
+              { l: "MAX", f: () => setAmt(Math.floor(usdg)) },
             ].map((b) => (
               <button key={b.l} onClick={b.f} className="rounded-full bg-panel py-3 text-sm font-semibold text-white hover:bg-panel2">{b.l}</button>
             ))}
