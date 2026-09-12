@@ -11,6 +11,7 @@ import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
 import { useRoundHistory } from "@/lib/useRoundHistory";
+import { useRefinedDrip } from "@/lib/useRefinedDrip";
 import { useBackClose } from "@/lib/useBackClose";
 import { compact, friendlyError } from "@/lib/format";
 import { gridMine } from "@/lib/site";
@@ -158,8 +159,11 @@ export default function MinePage() {
   // RefiningVault; Refined = DRIP in your wallet; NVDA = NVDA in your wallet. USDG pot is claimed
   // via Harvest (per settled round), so there's no running "USDG won" to read when live.
   const num = (v: unknown, dec: number) => (v !== undefined ? Number(v as bigint) / 10 ** dec : 0);
+  // "Refined DRIP" = how much you've actually refined FROM MINING (sum of your RefiningVault claims) —
+  // NOT your raw wallet DRIP balance, which would also count DRIP bought on Trade.
+  const refinedFromMining = useRefinedDrip(live && isConnected);
   const unrefinedShown = live ? num(refiningClaimable.data, 18) : unrefined; // DRIP harvested into the vault, refinable now
-  const claimedShown = live ? num(dripBal.data, 18) : claimed; // refined DRIP in wallet
+  const claimedShown = live ? refinedFromMining.refined : claimed; // refined-from-mining DRIP (event-derived)
   const nvdaWonShown = live ? num(nvdaBal.data, 18) : nvdaWon; // NVDA in wallet
   const usdgWonShown = live ? pending.totalUsdg : usdgWon; // USDG still to harvest (claimable)
   // Summary glance numbers (deploy panel's REWARDS row + overlay): total DRIP/NVDA you could walk away
@@ -875,7 +879,7 @@ export default function MinePage() {
           <div className="rounded-xl border border-line bg-ink/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-mute">Refined DRIP</div>
             <div className="mt-0.5 flex items-center gap-1 text-xl font-semibold text-white"><Drip /> {compact(claimedShown)}</div>
-            <div className="mt-0.5 text-[11px] text-mute">in your wallet</div>
+            <div className="mt-0.5 text-[11px] text-mute">refined from mining</div>
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between rounded-xl border border-line bg-ink/40 p-3">
@@ -1036,7 +1040,7 @@ export default function MinePage() {
               <h3 className="text-sm font-semibold text-white">Balances</h3>
               <div className="mt-3 space-y-3 text-sm">
                 <Row label="Unrefined DRIP"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(unrefinedShown)}</span></Row>
-                <Row label="Refined DRIP (wallet)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(claimedShown)}</span></Row>
+                <Row label="Refined DRIP (from mining)"><span className="flex items-center gap-1 font-semibold text-white"><Drip /> {compact(claimedShown)}</span></Row>
                 <Row label="NVDA mined"><span className="flex items-center gap-1 font-semibold text-white"><Nvda /> {fmt(nvdaWonShown, 6)}</span></Row>
                 <Row label="USDG claimable"><span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(usdgWonShown)}</span></Row>
               </div>
