@@ -96,56 +96,109 @@ export default function ChatPage() {
     }
   };
 
+  // Distinct recent chatters → little avatar stack in the header.
+  const recentPeople = Array.from(
+    msgs.filter((m) => !m.system).reduce((map, m) => map.set(m.name, m.hue), new Map<string, number>()),
+  ).slice(-5);
+
+  // Group consecutive messages from the same sender so the feed reads as threaded, not a wall of avatars.
+  const groups: { key: string; name: string; hue: number; mine: boolean; items: Msg[] }[] = [];
+  for (const m of msgs) {
+    if (m.system) { groups.push({ key: `sys-${m.id}`, name: "", hue: 0, mine: false, items: [m] }); continue; }
+    const last = groups[groups.length - 1];
+    const mine = m.name === myName;
+    if (last && !last.items[0].system && last.name === m.name && m.ts - last.items[last.items.length - 1].ts < 4 * 60_000) {
+      last.items.push(m);
+    } else {
+      groups.push({ key: `g-${m.id}`, name: m.name, hue: m.hue, mine, items: [m] });
+    }
+  }
+
   return (
     <AppChrome>
       <div className="flex h-[calc(100vh-8.5rem)] flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-line/60 px-5 py-3">
-          <div>
-            <h1 className="text-xl font-semibold text-white">Chat</h1>
-            <div className="flex items-center gap-1.5 text-xs text-mute">
-              <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-lime" : "bg-mute"}`} />
-              {live ? `${online} chatting` : "offline"}
+        <div className="flex items-center justify-between border-b border-line/60 bg-gradient-to-b from-panel/50 to-transparent px-5 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime/15 text-base">💬</div>
+            <div>
+              <h1 className="text-base font-semibold leading-tight text-white">Block Chat</h1>
+              <div className="flex items-center gap-1.5 text-[11px] text-mute">
+                <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-lime shadow-[0_0_6px_rgba(198,242,78,0.8)]" : "bg-mute"}`} />
+                {live ? `${online} online` : "offline"}
+              </div>
             </div>
           </div>
-          <span className="rounded-full border border-line bg-panel px-3 py-1 text-[11px] text-mute">Global</span>
+          <div className="flex items-center gap-3">
+            {recentPeople.length > 0 && (
+              <div className="flex items-center">
+                {recentPeople.map(([name, hue], i) => (
+                  <span
+                    key={name}
+                    style={{ background: `hsl(${hue} 65% 60%)`, marginLeft: i === 0 ? 0 : -8, zIndex: recentPeople.length - i }}
+                    className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-ink text-[9px] font-bold text-ink"
+                  >
+                    {initials(name)}
+                  </span>
+                ))}
+              </div>
+            )}
+            <span className="rounded-full border border-line bg-panel px-3 py-1 text-[11px] font-medium text-mute">🌐 Global</span>
+          </div>
         </div>
 
         {/* Feed */}
-        <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
           {msgs.length === 0 && (
-            <div className="mx-auto mt-10 max-w-xs rounded-2xl border border-line bg-panel p-5 text-center text-sm text-mute">
-              {live
-                ? "No messages yet — say gm to the block 👋"
-                : "Chat is offline. It turns on automatically once a database is connected (set DATABASE_URL in Vercel — a free Neon Postgres works)."}
+            <div className="mx-auto mt-12 max-w-xs rounded-2xl border border-line bg-panel/60 p-6 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-lime/10 text-2xl">👋</div>
+              <p className="text-sm leading-relaxed text-mute">
+                {live
+                  ? "Quiet in here. Say gm to the block and get the room going."
+                  : "Chat is offline. It turns on the moment a database is connected (set DATABASE_URL in Vercel — a free Neon Postgres works)."}
+              </p>
             </div>
           )}
-          {msgs.map((m) => {
-            const mine = m.name === myName;
-            return m.system ? (
-              <div key={m.id} className="mx-auto w-fit rounded-full border border-line bg-panel px-3 py-1 text-center text-[11px] text-mute">
-                {m.text}
-              </div>
-            ) : (
-              <div key={m.id} className={`flex gap-2.5 ${mine ? "flex-row-reverse" : ""}`}>
+
+          {groups.map((g) => {
+            if (g.items[0].system) {
+              return (
+                <div key={g.key} className="mx-auto w-fit rounded-full border border-line bg-panel/70 px-3 py-1 text-center text-[11px] text-mute">
+                  {g.items[0].text}
+                </div>
+              );
+            }
+            const { mine } = g;
+            return (
+              <div key={g.key} className={`flex items-end gap-2.5 ${mine ? "flex-row-reverse" : ""}`}>
                 <span
-                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-ink"
-                  style={{ background: `hsl(${m.hue} 70% 65%)` }}
+                  className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-ink ring-2 ring-ink"
+                  style={{ background: `hsl(${g.hue} 68% 62%)` }}
+                  title={mine ? "You" : g.name}
                 >
-                  {mine ? "YOU" : initials(m.name)}
+                  {mine ? "YOU" : initials(g.name)}
                 </span>
-                <div className={`max-w-[75%] ${mine ? "items-end text-right" : ""} flex flex-col`}>
-                  <div className="flex items-center gap-2 text-[11px] text-mute">
-                    <span className="font-semibold text-white/90">{mine ? "You" : m.name}</span>
-                    <span>{clock(m.ts)}</span>
+                <div className={`flex min-w-0 max-w-[76%] flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
+                  <div className={`flex items-center gap-2 px-1 text-[11px] text-mute ${mine ? "flex-row-reverse" : ""}`}>
+                    <span className="font-semibold text-white/90">{mine ? "You" : g.name}</span>
+                    <span className="text-mute/70">{clock(g.items[g.items.length - 1].ts)}</span>
                   </div>
-                  <div
-                    className={`mt-1 inline-block rounded-2xl px-3.5 py-2 text-sm ${
-                      mine ? "bg-lime text-ink" : "bg-panel text-white"
-                    }`}
-                  >
-                    {m.text}
-                  </div>
+                  {g.items.map((m, idx) => {
+                    // Bubble corner tucks toward the avatar on the first bubble of a group.
+                    const tight = mine
+                      ? idx === 0 ? "rounded-2xl rounded-br-md" : "rounded-2xl"
+                      : idx === 0 ? "rounded-2xl rounded-bl-md" : "rounded-2xl";
+                    return (
+                      <div
+                        key={m.id}
+                        className={`inline-block max-w-full break-words px-3.5 py-2 text-sm shadow-sm ${tight} ${
+                          mine ? "bg-lime text-ink" : "border border-line/70 bg-panel text-white"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -154,28 +207,32 @@ export default function ChatPage() {
         </div>
 
         {/* Composer */}
-        <div className="border-t border-line/60 bg-ink/90 px-3 py-3">
-          <div className="flex items-center gap-2">
+        <div className="border-t border-line/60 bg-ink/95 px-3 py-3 backdrop-blur">
+          <div className="flex items-end gap-2 rounded-2xl border border-line bg-panel px-2 py-1.5 focus-within:border-mute/60">
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && send()}
               placeholder="Message the block…"
               maxLength={240}
-              className="flex-1 rounded-full border border-line bg-panel px-4 py-2.5 text-sm text-white placeholder:text-mute focus:border-mute/60 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-sm text-white placeholder:text-mute focus:outline-none"
             />
+            {draft.length > 0 && <span className="pb-1 text-[10px] tabular-nums text-mute/60">{draft.length}/240</span>}
             <button
               onClick={send}
               disabled={!draft.trim()}
-              className="shrink-0 rounded-full bg-lime px-5 py-2.5 text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute"
+              aria-label="Send"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lime text-ink transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:bg-panel2 disabled:text-mute disabled:hover:scale-100"
             >
-              Send
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10l14-6-6 14-2-6-6-2z" />
+              </svg>
             </button>
           </div>
           <p className="mt-2 text-center text-[11px] text-mute/60">
             {live
-              ? `Posting as ${myName}${address ? " (wallet)" : " · connect a wallet for your address"} · saved`
-              : "Chat is offline until a database is connected (DATABASE_URL). Messages you type now aren't saved or shared."}
+              ? `Posting as ${myName}${address ? " · wallet" : " · connect a wallet for your address"} · saved on-chain-adjacent`
+              : "Offline until a database is connected — messages you type now aren't saved or shared."}
           </p>
         </div>
       </div>

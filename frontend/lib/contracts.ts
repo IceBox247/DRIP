@@ -47,7 +47,27 @@ export const addresses = {
   randomness: (process.env.NEXT_PUBLIC_RANDOMNESS_ADDRESS || MAINNET.randomness) as `0x${string}` | "",
   adapter: (process.env.NEXT_PUBLIC_ADAPTER_ADDRESS || MAINNET.adapter) as `0x${string}` | "",
   curve: (process.env.NEXT_PUBLIC_CURVE_ADDRESS || MAINNET.curve) as `0x${string}` | "",
+  // AutoMineVault — one-signature auto-mining. Empty until GridMine v2 + the vault are deployed; set
+  // NEXT_PUBLIC_AUTOMINE_ADDRESS then. While empty, auto-mine falls back to sign-per-round.
+  autoMineVault: (process.env.NEXT_PUBLIC_AUTOMINE_ADDRESS || "") as `0x${string}` | "",
 };
+
+// AutoMineVault: configure a plan (one deposit), check/stop it, withdraw unspent USDG. The keeper
+// drives executeFor each round on-chain — the app only configures + reads + withdraws.
+export const autoMineVaultAbi = [
+  { type: "function", name: "configure", stateMutability: "nonpayable", inputs: [{ name: "tiles", type: "uint8[]" }, { name: "perTile", type: "uint256" }, { name: "rounds", type: "uint32" }], outputs: [] },
+  { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  { type: "function", name: "isActive", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "allPlayers", stateMutability: "view", inputs: [], outputs: [{ type: "address[]" }] },
+  { type: "function", name: "executeMany", stateMutability: "nonpayable", inputs: [{ type: "address[]" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "function", name: "planOf", stateMutability: "view", inputs: [{ type: "address" }],
+    outputs: [
+      { name: "tiles", type: "uint8[]" }, { name: "perTile", type: "uint256" }, { name: "roundsLeft", type: "uint32" },
+      { name: "balance", type: "uint256" }, { name: "lastDeployAt", type: "uint64" },
+    ],
+  },
+] as const;
 
 // PonsSwapAdapter: swapExactIn(tokenIn, tokenOut, amountIn, minOut) → amountOut (sent to caller).
 export const swapAdapterAbi = [

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { robinhoodChain, addresses, gridMineAbi, contractsReady } from "@/lib/contracts";
+import { robinhoodChain, addresses, gridMineAbi, contractsReady, autoMineVaultAbi } from "@/lib/contracts";
 
 // Keeper — runs each round: closeRound() then processRewards() on the freshly-settled round(s).
 // Called by Vercel Cron (see vercel.json). Authorized by CRON_SECRET so nobody else can trigger it.
@@ -84,6 +84,30 @@ async function run() {
       }
     } catch {
       // already processed, or a transient error — leave it for the next tick.
+    }
+  }
+
+  // 3) Auto-mine: run every active plan for the current round (one deploy each, on the player's behalf
+  //    via GridMine.deployManyFor). Opt-in via AUTOMINE_ADDRESS; a no-op if the vault isn't deployed.
+  const autoMine = (process.env.AUTOMINE_ADDRESS || process.env.NEXT_PUBLIC_AUTOMINE_ADDRESS) as `0x${string}` | undefined;
+  if (autoMine) {
+    try {
+      const players = (await pub.readContract({ address: autoMine, abi: autoMineVaultAbi, functionName: "allPlayers" })) as `0x${string}`[];
+      const active: `0x${string}`[] = [];
+      for (const p of players) {
+        try {
+          if (await pub.readContract({ address: autoMine, abi: autoMineVaultAbi, functionName: "isActive", args: [p] })) active.push(p);
+        } catch { /* skip a bad read */ }
+      }
+      if (active.length > 0) {
+        const { request } = await pub.simulateContract({ address: autoMine, abi: autoMineVaultAbi, functionName: "executeMany", args: [active], account });
+        const hash = await wallet.writeContract(request);
+        actions.push(`autoMine.executeMany(${active.length}) ${hash}`);
+      } else {
+        actions.push("autoMine: no active plans");
+      }
+    } catch {
+      actions.push("autoMine skipped (error)");
     }
   }
 

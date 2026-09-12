@@ -1,0 +1,13 @@
+{
+  "name": "drip-keeper-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fast always-on keeper for Grid/Block Mine — settles rounds in ~2s instead of the Vercel cron's up-to-60s.",
+  "scripts": {
+    "start": "node bot.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.21.55"
+  }
+}

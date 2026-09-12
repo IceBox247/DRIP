@@ -40,3 +40,31 @@ hourly reward cycle (SPEC §3, §6). The keeper is also where the **Pons fee int
 ## Not yet chosen
 
 Gelato vs. Chainlink Automation. Pick based on Robinhood Chain support and cost; document here.
+
+---
+
+## Fast keeper bot (`bot.mjs`) — near-instant settling
+
+The Vercel cron keeper (`frontend/app/api/keeper/route.ts`) runs **once per minute**, so a finished
+round can sit in "settling…" for up to ~60s. For near-instant settling, run the standalone
+**`bot.mjs`** on any always-on host (Railway, Render, Fly, a VPS, a Raspberry Pi). It polls every ~2s
+and settles the instant a round's 60s window elapses, then processes rewards and (optionally) runs the
+AutoMineVault.
+
+> Note: a round is **60 seconds long by design** — nothing can settle it *before* 60s. This bot makes
+> the settlement *after* the round ends near-instant (~2s) instead of waiting for the next cron minute.
+
+```bash
+cd keeper
+npm install
+KEEPER_PRIVATE_KEY=0x...          \
+GRIDMINE_ADDRESS=0x2b463b2FCa32E4B0532EDb1eaACB6c3EC0BBAf89 \
+RANDOMNESS_ADDRESS=0x...          \  # the mock randomness source (so closeRound's word is seeded)
+node bot.mjs
+```
+
+Optional env: `RPC_URL` (default mainnet), `CHAIN_ID` (default 4663), `AUTOMINE_ADDRESS` (v2 vault),
+`POLL_MS` (default 2000), `KEEPER_MIN_OUT` (processRewards slippage floor, default 0).
+
+Safe to run **alongside** the Vercel cron — every entrypoint is permissionless and idempotent, so if
+both fire, the loser just reverts harmlessly. Fund the keeper wallet with a little ETH for gas.

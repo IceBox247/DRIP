@@ -26,7 +26,7 @@ export function GridHero() {
       <div className="mb-3 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-2 rounded-full border border-lime/40 bg-lime/10 px-2.5 py-0.5 font-medium text-lime">
           <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulseDot" />
-          Block Mine · round {round}
+          Block Mine · dig {round}
         </span>
         <span className="font-mono text-mute">25 blocks · 60s</span>
       </div>
@@ -54,9 +54,9 @@ export function GridHero() {
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-mute">
         <span>
-          Winning block <span className="font-semibold text-lime">#{winner}</span>
+          Struck block <span className="font-semibold text-lime">#{winner}</span>
         </span>
-        <span>losers&rsquo; pot → winners + buyback</span>
+        <span>haul → miners + buyback</span>
       </div>
     </div>
   );

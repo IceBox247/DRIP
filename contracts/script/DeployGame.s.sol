@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DripToken} from "../src/game/DripToken.sol";
 import {GridMine} from "../src/game/GridMine.sol";
+import {AutoMineVault, IGridMineDeployFor} from "../src/game/AutoMineVault.sol";
 import {RefiningVault} from "../src/game/RefiningVault.sol";
 import {StakeVault} from "../src/game/StakeVault.sol";
 import {ISwapRouter} from "../src/game/interfaces/ISwapRouter.sol";
@@ -108,6 +109,12 @@ contract DeployGame is Script {
         );
 
         refining.setGridMine(address(gridMine));
+
+        // Auto-mine vault: one-signature auto-mining. Authorized as a GridMine operator so it can
+        // deploy on behalf of players (winnings still go straight to the player). The keeper drives it.
+        AutoMineVault autoMine = new AutoMineVault(IERC20(usdg), IGridMineDeployFor(address(gridMine)));
+        gridMine.setOperator(address(autoMine), true);
+
         if (mockRng) MockRandomness(randomness).setConsumer(address(gridMine));
         if (commitReveal) {
             // Wire the consumer; operator + bond are configured post-deploy by the owner (keeper wallet).
@@ -163,6 +170,7 @@ contract DeployGame is Script {
 
         console2.log("DripToken:    ", address(drip));
         console2.log("GridMine:     ", address(gridMine));
+        console2.log("AutoMineVault:", address(autoMine));
         console2.log("RefiningVault:", address(refining));
         console2.log("StakeVault:   ", address(stakeVault));
     }

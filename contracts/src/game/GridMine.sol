@@ -97,6 +97,10 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     mapping(uint256 => mapping(address => bool)) public dripClaimed;
     mapping(uint256 => mapping(address => bool)) public nvdaClaimed;
 
+    /// @notice Authorized operators (e.g. the AutoMineVault) that may deploy ON BEHALF of a player via
+    ///         `deployManyFor` — the stake is credited to that player, and they harvest normally.
+    mapping(address => bool) public operators;
+
     event RoundOpened(uint256 indexed round, uint256 startTime);
     event Deployed(uint256 indexed round, address indexed player, uint8 tile, uint256 amount);
     event RoundClosed(uint256 indexed round);
@@ -107,6 +111,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     event HarvestedDrip(uint256 indexed round, address indexed player, uint256 dripOut);
     event HarvestedNvda(uint256 indexed round, address indexed player, uint256 nvdaOut);
     event PausedSet(bool paused);
+    event OperatorSet(address indexed operator, bool allowed);
 
     error BadTile();
     error BadInput();
@@ -122,6 +127,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     error NoWinningStake();
     error NothingToHarvest();
     error IsPaused();
+    error NotOperator();
 
     constructor(
         IERC20 usdg_,
@@ -155,7 +161,7 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         Round storage r = rounds[currentRound];
         _startClockIfFirst(r);
         usdg.safeTransferFrom(msg.sender, address(this), amount);
-        _record(r, tile, amount);
+        _record(r, msg.sender, tile, amount);
     }
 
     /// @notice Deploy onto several tiles in ONE transaction — one USDG transfer for the sum, then the
@@ -176,7 +182,33 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
         _startClockIfFirst(r);
         usdg.safeTransferFrom(msg.sender, address(this), gross); // one transfer for the whole batch
         for (uint256 i; i < n; i++) {
-            _record(r, tiles[i], amounts[i]);
+            _record(r, msg.sender, tiles[i], amounts[i]);
+        }
+    }
+
+    /// @notice Deploy onto several tiles ON BEHALF OF `player`, in ONE transaction. Only an authorized
+    ///         operator (e.g. the AutoMineVault) may call this: the USDG is pulled from the operator
+    ///         (msg.sender), but the stake — and therefore all winnings via `harvest` — is credited to
+    ///         `player`, exactly as if they had deployed themselves. This is what lets a keeper mine for
+    ///         a user each round without the user signing every round, while keeping winnings theirs.
+    function deployManyFor(address player, uint8[] calldata tiles, uint256[] calldata amounts) external nonReentrant {
+        if (paused) revert IsPaused();
+        if (!operators[msg.sender]) revert NotOperator();
+        if (player == address(0)) revert BadInput();
+        uint256 n = tiles.length;
+        if (n == 0 || n != amounts.length) revert BadInput();
+        _rollIfElapsed();
+        Round storage r = rounds[currentRound];
+        uint256 gross;
+        for (uint256 i; i < n; i++) {
+            if (amounts[i] == 0) revert ZeroAmount();
+            if (tiles[i] >= TILES) revert BadTile();
+            gross += amounts[i];
+        }
+        _startClockIfFirst(r);
+        usdg.safeTransferFrom(msg.sender, address(this), gross); // pulled from the operator (the vault)
+        for (uint256 i; i < n; i++) {
+            _record(r, player, tiles[i], amounts[i]);
         }
     }
 
@@ -199,15 +231,15 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     /// @dev Per-tile accounting after USDG is already in the contract. The 1% entry fee is skimmed
     ///      HERE, before funds enter the pool, so it never touches the win/loss math; only the net
     ///      99% is staked. Accrued admin is withdrawn separately and is NOT part of any round's pot.
-    function _record(Round storage r, uint8 tile, uint256 amount) internal {
+    function _record(Round storage r, address player, uint8 tile, uint256 amount) internal {
         uint256 admin = (amount * ADMIN_BPS) / BPS;
         uint256 net = amount - admin;
         adminAccrued += admin;
         tileTotal[currentRound][tile] += net;
-        stakeOf[currentRound][tile][msg.sender] += net;
-        _segs[currentRound][tile].push(Seg(msg.sender, tileTotal[currentRound][tile]));
+        stakeOf[currentRound][tile][player] += net;
+        _segs[currentRound][tile].push(Seg(player, tileTotal[currentRound][tile]));
         r.totalIn += net;
-        emit Deployed(currentRound, msg.sender, tile, net);
+        emit Deployed(currentRound, player, tile, net);
     }
 
     /// @notice Settle the current round if its window has elapsed and open the next. Permissionless —
@@ -381,6 +413,15 @@ contract GridMine is IRandomnessConsumer, ReentrancyGuard, Ownable {
     function setPaused(bool p) external onlyOwner {
         paused = p;
         emit PausedSet(p);
+    }
+
+    /// @notice Authorize (or revoke) an operator that may call `deployManyFor` to mine on behalf of a
+    ///         player — intended for the AutoMineVault. Owner-only; an operator can never move winnings
+    ///         (those go straight to the credited player), only spend the USDG it itself supplies.
+    function setOperator(address operator, bool allowed) external onlyOwner {
+        if (operator == address(0)) revert BadInput();
+        operators[operator] = allowed;
+        emit OperatorSet(operator, allowed);
     }
 
     /// @notice Send accrued 1% entry fees to the marketing/ops wallet. Permissionless — the funds

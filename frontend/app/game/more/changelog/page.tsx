@@ -17,7 +17,7 @@ const log = [
     tag: "Earlier", state: "shipped", items: [
       "Winners earn NVDA + DRIP — the winners' cut is paid 6% DRIP + 4% tokenized NVIDIA (1-or-all).",
       "Explore — market, mining, staking, supply, plus Activity (rounds/motherlodes) & Revenue tables + leaderboards.",
-      "Mine — ORE-style 5×5 block board, Lite/Pro, editable amount, 1% entry fee, 1-or-all, motherlode, refining; wait-for-miner + auto next round.",
+      "Mine — 5×5 block board, Lite/Pro, editable amount, 1% entry fee, 1-or-all, motherlode, refining; wait-for-miner + auto next dig.",
       "Stake & Trade — deposit/withdraw and swap screens.",
       "More menu — About, Changelog, Explore, Reserve, Rewards, Shield.",
       "Contracts tested end-to-end against real USDG on a mainnet fork.",
