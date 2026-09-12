@@ -14,7 +14,7 @@ const items: Item[] = [
   { href: "/game/more/rewards", label: "Rewards", desc: "Where each round's DRIP goes", icon: <GiftIcon /> },
   { href: "/game/more/reserve", label: "Reserve", desc: "Motherlode & buyback pools", icon: <VaultIcon /> },
   { href: "/game/more/shield", label: "Shield", desc: "Fair-play & anti-manipulation", icon: <ShieldIcon /> },
-  { href: "/game/more/about", label: "About", desc: "What Grid Mine is and how it works", icon: <InfoIcon /> },
+  { href: "/game/more/about", label: "About", desc: "What Block Mine is and how it works", icon: <InfoIcon /> },
   { href: "/game/more/changelog", label: "Changelog", desc: "What's shipped and what's next", icon: <ListIcon /> },
 ];
 
@@ -27,7 +27,7 @@ export default function MorePage() {
     <AppChrome>
       <div className="px-5 pt-6">
         <h1 className="text-3xl font-semibold tracking-tight text-white">More</h1>
-        <p className="mt-1 text-sm text-mute">Everything around the grid.</p>
+        <p className="mt-1 text-sm text-mute">Everything around the block.</p>
 
         <div className="mt-6 space-y-2">{items.map((it) => <MenuRow key={it.href} {...it} />)}</div>
 

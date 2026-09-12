@@ -13,7 +13,7 @@ const pools = [
 
 export default function ReservePage() {
   return (
-    <MorePage title="Reserve" subtitle="The pools the grid keeps.">
+    <MorePage title="Reserve" subtitle="The pools the block keeps.">
       <div className="space-y-3">
         {pools.map((p) => (
           <div key={p.name} className="rounded-2xl border border-line bg-panel p-4">

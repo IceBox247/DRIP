@@ -9,8 +9,8 @@ import { site } from "@/lib/site";
 
 const steps = [
   { n: "01", t: "Deploy", d: "Stake USDG onto any of the 25 tiles before the round closes." },
-  { n: "02", t: "One tile wins", d: "A secure on-chain RNG picks it — 1-in-25. Nobody can rig it." },
-  { n: "03", t: "Winners split the pot", d: "Losers' USDG goes to the winning tile, pro-rata, in USDG." },
+  { n: "02", t: "One block wins", d: "A secure on-chain RNG picks it — 1-in-25. Nobody can rig it." },
+  { n: "03", t: "Winners split the pot", d: "Losers' USDG goes to the winning block, pro-rata, in USDG." },
   { n: "04", t: "Buy, burn, refine", d: "A 10% cut buys DRIP — burned, staked, and paid to winners." },
 ];
 
@@ -26,13 +26,13 @@ export default function Home() {
             <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
               <div>
                 <h1 className="text-5xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
-                  Mine the grid for
+                  Mine the blocks for
                   <br />
                   <span className="text-lime">USDG &amp; DRIP.</span>
                 </h1>
 
                 <p className="mt-6 max-w-md text-lg leading-relaxed text-mute">
-                  A round every 60 seconds. One tile wins. Nothing is minted, the team holds zero.
+                  A round every 60 seconds. One block wins. Nothing is minted, the team holds zero.
                 </p>
 
                 <div className="mt-8 flex items-center gap-5">

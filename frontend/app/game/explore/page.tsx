@@ -21,7 +21,7 @@ export default function ExplorePage() {
   const rows = act === "rounds" ? s.activity : s.motherlodes;
 
   return (
-    <MorePage title="Explore" subtitle="Live grid stats & leaderboards — on-chain.">
+    <MorePage title="Explore" subtitle="Live block stats & leaderboards — on-chain.">
       <Section title="Overview">
         <Grid>
           <Stat label="Rounds settled" value={fmt(s.roundsSettled)} sub="all-time" />
@@ -63,7 +63,7 @@ export default function ExplorePage() {
             <thead>
               <tr className="border-b border-line/60 text-[11px] uppercase tracking-wide text-mute">
                 <th className="px-3 py-2.5 font-medium">Round</th>
-                <th className="px-3 py-2.5 font-medium">Tile</th>
+                <th className="px-3 py-2.5 font-medium">Block</th>
                 <th className="px-3 py-2.5 font-medium">Type</th>
                 <th className="px-3 py-2.5 text-right font-medium">Pool</th>
                 <th className="px-3 py-2.5 text-right font-medium">Winners</th>
@@ -108,7 +108,7 @@ export default function ExplorePage() {
                 <span className="text-white">{short(r.addr)}</span>
               </span>
               <span className="flex items-center gap-3 text-mute">
-                <span className="text-xs">{r.tiles} tiles</span>
+                <span className="text-xs">{r.tiles} blocks</span>
                 <span className="font-semibold text-white">{compact(r.total)} USDG</span>
               </span>
             </div>

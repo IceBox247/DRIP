@@ -184,7 +184,7 @@ export default function MinePage() {
   // later round needs only the deploy signature. Returns true on a confirmed send.
   const runDeploy = async (tileIdxs: number[], amt: number, coverRounds = 1): Promise<boolean> => {
     if (!isConnected) { setTxMsg("Connect your wallet to deploy."); return false; }
-    if (tileIdxs.length === 0) { setTxMsg("Select at least one tile to deploy."); return false; }
+    if (tileIdxs.length === 0) { setTxMsg("Select at least one block to deploy."); return false; }
     // Make sure the wallet is on Robinhood Chain, or the tx would go to (and cost gas on) the wrong network.
     if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return false; }
     try {
@@ -217,13 +217,13 @@ export default function MinePage() {
         await allowance.refetch();
         if (confirmed < need) { setTxMsg("Approval is still pending — give it a few seconds, then tap Deploy again."); return false; }
       }
-      setTxMsg(`Deploying to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""}…`);
+      setTxMsg(`Deploying to ${tileIdxs.length} block${tileIdxs.length > 1 ? "s" : ""}…`);
       await writeContractAsync({
         address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "deployMany",
         args: [tileIdxs, amountsArg], chainId: CHAIN_ID,
         // No forced gas limit — the wallet estimates the real (small) fee, so low-ETH wallets work.
       });
-      setTxMsg(`Deployed on-chain to ${tileIdxs.length} tile${tileIdxs.length > 1 ? "s" : ""} ✓`);
+      setTxMsg(`Deployed on-chain to ${tileIdxs.length} block${tileIdxs.length > 1 ? "s" : ""} ✓`);
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
       return true;
     } catch (e) {
@@ -246,7 +246,7 @@ export default function MinePage() {
   const startAuto = async () => {
     if (!live) { setTxMsg("Auto-mine runs on-chain — not in demo."); return; }
     if (!isConnected) { setTxMsg("Connect your wallet to auto-mine."); return; }
-    if (targets.length === 0) { setTxMsg("Select tiles first, then start auto-mine."); return; }
+    if (targets.length === 0) { setTxMsg("Select blocks first, then start auto-mine."); return; }
     if (amount <= 0) { setTxMsg("Enter an amount first."); return; }
     const cfg = { tiles: [...targets], amount };
     autoCfg.current = cfg;
@@ -560,7 +560,7 @@ export default function MinePage() {
       {revealing && (
         <div className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-sm font-semibold text-white">
           <span className="h-2 w-2 animate-ping rounded-full bg-lime" />
-          Finding the winning tile…
+          Finding the winning block…
         </div>
       )}
 
@@ -568,7 +568,7 @@ export default function MinePage() {
       {liveWin && !revealing && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-center">
           <div className="text-sm font-semibold text-white">
-            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "🎉 "}Tile #{liveWin.tile} won round #{liveWin.round}
+            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "🎉 "}Block #{liveWin.tile} won round #{liveWin.round}
           </div>
           <div className="mt-0.5 text-[11px] text-mute">A fresh round is live — deploy to jump in.</div>
         </div>
@@ -576,7 +576,7 @@ export default function MinePage() {
 
       {result && (
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
-          <div className="font-semibold text-white">Round #{round} — tile {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
+          <div className="font-semibold text-white">Round #{round} — block {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
           <div className="mt-1">
             {result.won ? (
               <>
@@ -588,7 +588,7 @@ export default function MinePage() {
                   : ` · +${fmt(result.drip, 3)} DRIP · +${fmt(result.nvda, 4)} NVDA`}
               </>
             ) : (
-              "You had no stake on the winning tile."
+              "You had no stake on the winning block."
             )}
           </div>
           <button onClick={nextRound} className="mt-3 w-full rounded-xl bg-lime py-2.5 text-sm font-semibold text-ink">Next round now</button>
@@ -726,7 +726,7 @@ export default function MinePage() {
 
           <div className="mt-5 space-y-3 text-sm">
             {mode === "pro" && (
-              <Row label="TILES">
+              <Row label="BLOCKS">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setSelected(selected.length === N ? [] : Array.from({ length: N }, (_, i) => i))}
                     className="rounded-lg bg-panel px-3 py-1 text-xs font-semibold text-white">ALL</button>
@@ -735,7 +735,7 @@ export default function MinePage() {
               </Row>
             )}
             <Row label="ROUNDS"><span className="font-semibold text-white">{autoLeft > 0 ? `${autoLeft} left` : autoMode ? autoRounds : 1}</span></Row>
-            <Row label="PER TILE">
+            <Row label="PER BLOCK">
               <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
             </Row>
             <Row label="TOTAL">
@@ -759,7 +759,7 @@ export default function MinePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-white">Auto-mine ⛏️</div>
-                  <div className="text-[11px] text-mute">Re-deploy your tiles every round automatically.</div>
+                  <div className="text-[11px] text-mute">Re-deploy your blocks every round automatically.</div>
                 </div>
                 <button role="switch" aria-checked={autoMode} aria-label="Toggle auto-mine"
                   onClick={() => setAutoMode((v) => !v)}
@@ -808,13 +808,13 @@ export default function MinePage() {
               ? (live && !isConnected
                   ? "Connect wallet to auto-mine"
                   : mode === "pro" && selected.length === 0
-                  ? "Select tiles to auto-mine"
+                  ? "Select blocks to auto-mine"
                   : `Start auto-mine · ${autoRounds} round${autoRounds > 1 ? "s" : ""}`)
               : live && !isConnected
               ? "Connect wallet to deploy"
               : mode === "pro" && selected.length === 0
-              ? "Select tiles to deploy"
-              : `Deploy ${fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${fmt(amount, amount % 1 ? 2 : 0)}/tile × ${targets.length}` : ""}`}
+              ? "Select blocks to deploy"
+              : `Deploy ${fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)} USDG${live ? " on-chain" : ""}${targets.length > 1 ? ` · ${fmt(amount, amount % 1 ? 2 : 0)}/block × ${targets.length}` : ""}`}
           </button>
           <div className="mt-2 flex justify-between text-xs text-mute">
             <span>{live ? (isConnected ? "On-chain" : "Live round · connect to play") : `Wallet ${fmt(usdg)} USDG`}</span>
@@ -823,7 +823,7 @@ export default function MinePage() {
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
           {live && (
             <p className="mt-1 text-center text-[11px] text-mute/70">
-              Amount is <strong>per tile</strong> — total = amount × tiles. Winnings are live: harvest each settled round below, then refine your DRIP.
+              Amount is <strong>per block</strong> — total = amount × blocks. Winnings are live: harvest each settled round below, then refine your DRIP.
             </p>
           )}
         </div>
@@ -888,7 +888,7 @@ export default function MinePage() {
         {/* Nothing to harvest right now (live) — a friendly note so the section isn't just balances. */}
         {live && pending.rounds.length === 0 && (
           <div className="mt-3 rounded-xl border border-line bg-ink/40 px-3 py-2.5 text-center text-[11px] text-mute">
-            No unclaimed winnings. Win a round (stake on the winning tile) and it&rsquo;ll show here to harvest.
+            No unclaimed winnings. Win a round (stake on the winning block) and it&rsquo;ll show here to harvest.
           </div>
         )}
         <button onClick={() => (live ? doRefine(100) : setShowRewards(true))} disabled={unrefinedShown <= 0}
@@ -973,7 +973,7 @@ export default function MinePage() {
                     <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-ink">{r.hadWinner ? (r.soloMode ? "Solo" : "Split") : "No winner"}</span>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 text-[11px] text-mute">
-                    <span className="flex items-center gap-1"><Grid4 /> tile {r.winningTile} won</span>
+                    <span className="flex items-center gap-1"><Grid4 /> block {r.winningTile} won</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1 text-mute">pool <span className="font-semibold text-white"><Usdg /> {fmt(r.totalIn, 2)}</span></span>

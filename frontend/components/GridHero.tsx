@@ -26,9 +26,9 @@ export function GridHero() {
       <div className="mb-3 flex items-center justify-between text-xs">
         <span className="inline-flex items-center gap-2 rounded-full border border-lime/40 bg-lime/10 px-2.5 py-0.5 font-medium text-lime">
           <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulseDot" />
-          Grid Mine · round {round}
+          Block Mine · round {round}
         </span>
-        <span className="font-mono text-mute">25 tiles · 60s</span>
+        <span className="font-mono text-mute">25 blocks · 60s</span>
       </div>
       <div className="grid grid-cols-5 gap-1.5" aria-hidden="true">
         {Array.from({ length: N }, (_, i) => {
@@ -54,7 +54,7 @@ export function GridHero() {
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-mute">
         <span>
-          Winning tile <span className="font-semibold text-lime">#{winner}</span>
+          Winning block <span className="font-semibold text-lime">#{winner}</span>
         </span>
         <span>losers&rsquo; pot → winners + buyback</span>
       </div>
