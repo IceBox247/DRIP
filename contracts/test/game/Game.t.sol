@@ -207,7 +207,14 @@ contract GameTest is Test {
         vm.stopPrank();
         d.mint(address(sv), 50 ether);
         sv.notify(50 ether);
-        assertEq(sv.earned(alice), 50 ether, "alice earned all rewards");
+        // Streamed, not lump: right after notify almost nothing has accrued...
+        assertLt(sv.earned(alice), 1 ether, "rewards stream, not paid instantly");
+        // ...halfway through the 7-day window, ~half has streamed...
+        vm.warp(block.timestamp + sv.REWARD_DURATION() / 2);
+        assertApproxEqAbs(sv.earned(alice), 25 ether, 0.01 ether, "half streamed at the halfway point");
+        // ...and by the end, the whole 50 (minus dust from integer division) is claimable.
+        vm.warp(block.timestamp + sv.REWARD_DURATION());
+        assertApproxEqAbs(sv.earned(alice), 50 ether, 0.01 ether, "full amount streamed by period end");
     }
 
     function test_deployMany_oneTx() public {

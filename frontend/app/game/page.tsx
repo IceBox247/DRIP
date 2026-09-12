@@ -634,10 +634,12 @@ export default function MinePage() {
           <div className="mt-1 text-[11px] text-mute">
             The keeper is picking the winner, buying &amp; distributing DRIP/NVDA, and opening the next round — or just deploy again to jump into a fresh one.
           </div>
-          {address?.toLowerCase() === "0xa30120ee727b2e540c41400ae4dd60e3b4572cbe" && (
+          {/* Settling is permissionless: if the keeper is slow, ANY connected player can push the round
+              over (and process its rewards) so it doesn't hang. Costs a little gas; optional. */}
+          {isConnected && (
             <button onClick={settleAndProcess} disabled={settling}
               className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 py-2 text-xs font-semibold text-lime disabled:opacity-60">
-              {settling ? "Settling…" : "Force settle now (admin)"}
+              {settling ? "Settling…" : "Settle this round now"}
             </button>
           )}
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
