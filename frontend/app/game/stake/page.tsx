@@ -5,7 +5,7 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 import { formatUnits, parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi } from "@/lib/contracts";
-import { compact } from "@/lib/format";
+import { compact, friendlyError } from "@/lib/format";
 
 // Stake — REAL stake-to-earn against StakeVault on Robinhood Chain. Stake DRIP, earn the 10% stakers'
 // slice of every buyback (paid in DRIP). Reads staked/earned/totalStaked on-chain; stake/withdraw/
@@ -85,7 +85,7 @@ export default function StakePage() {
       setAmount(0);
       setTimeout(refetch, 3000);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message.slice(0, 120) : "transaction failed");
+      setMsg(friendlyError(e, "Transaction failed — please try again."));
     } finally {
       setBusy(false);
     }
@@ -100,7 +100,7 @@ export default function StakePage() {
       setMsg("Rewards claimed ✓");
       setTimeout(refetch, 3000);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message.slice(0, 120) : "claim failed");
+      setMsg(friendlyError(e, "Couldn't claim — please try again."));
     } finally {
       setBusy(false);
     }

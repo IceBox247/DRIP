@@ -10,7 +10,7 @@ import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
 import { useRoundHistory } from "@/lib/useRoundHistory";
-import { compact } from "@/lib/format";
+import { compact, friendlyError } from "@/lib/format";
 import { gridMine } from "@/lib/site";
 
 // Grid Mine — ORE-style Mine screen. Interactive DEMO (fake funds, no chain). Round math mirrors
@@ -181,7 +181,7 @@ export default function MinePage() {
       setSelected([]);
       setTimeout(() => { chain.refetch(); allowance.refetch(); }, 3000);
     } catch (e) {
-      setTxMsg(e instanceof Error ? e.message.slice(0, 120) : "deploy failed");
+      setTxMsg(friendlyError(e, "Couldn't deploy — please try again."));
     }
   };
 
@@ -211,7 +211,7 @@ export default function MinePage() {
       setTxMsg("Round settled ✓ — winners can now Harvest.");
       setTimeout(() => chain.refetch(), 3000);
     } catch (e) {
-      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "settle failed");
+      setTxMsg(friendlyError(e, "Couldn't settle the round — please try again."));
     } finally {
       setSettling(false);
     }
@@ -227,7 +227,7 @@ export default function MinePage() {
       setTxMsg(`Harvested round #${round} ✓`);
       setTimeout(() => { chain.refetch(); pending.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
     } catch (e) {
-      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "harvest failed");
+      setTxMsg(friendlyError(e, "Couldn't harvest — please try again."));
     }
   };
 
@@ -242,7 +242,7 @@ export default function MinePage() {
         setTxMsg(`Harvesting round #${r} (${i + 1}/${roundsToDo.length})…`);
         await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(r)], gas: BigInt(400000) });
       } catch (e) {
-        setTxMsg(e instanceof Error ? e.message.slice(0, 140) : `harvest of round #${r} failed`);
+        setTxMsg(friendlyError(e, `Couldn't harvest round #${r} — please try again.`));
         return; // stop the batch on the first failure/rejection
       }
     }
@@ -265,7 +265,7 @@ export default function MinePage() {
       setShowRewards(false);
       setTimeout(() => { refiningClaimable.refetch(); dripBal.refetch(); }, 3000);
     } catch (e) {
-      setTxMsg(e instanceof Error ? e.message.slice(0, 140) : "refine failed");
+      setTxMsg(friendlyError(e, "Couldn't refine — please try again."));
     }
   };
 

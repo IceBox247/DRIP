@@ -5,7 +5,7 @@ import { useAccount, usePublicClient, useReadContract, useWriteContract } from "
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { addresses, contractsReady, erc20Abi, ponsCurveAbi } from "@/lib/contracts";
-import { compact } from "@/lib/format";
+import { compact, friendlyError } from "@/lib/format";
 
 // Trade — REAL swap, both directions, straight against DRIP's Pons bonding curve:
 //   Buy  USDG → DRIP  via curve.buy(quoteIn, minTokensOut, you)  (approve USDG to the curve)
@@ -108,7 +108,7 @@ export default function TradePage() {
       setAmount(0); setEst(null);
       setTimeout(() => { usdgBal.refetch(); dripBal.refetch(); usdgAllowance.refetch(); dripAllowance.refetch(); tokenReserve.refetch(); quoteReserve.refetch(); }, 3000);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message.slice(0, 120) : "swap failed");
+      setMsg(friendlyError(e, "Swap failed — please try again."));
     } finally {
       setBusy(false);
     }
