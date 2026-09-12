@@ -116,7 +116,7 @@ export default function ChatPage() {
           {msgs.length === 0 && (
             <div className="mx-auto mt-10 max-w-xs rounded-2xl border border-line bg-panel p-5 text-center text-sm text-mute">
               {live
-                ? "No messages yet — say gm to the grid 👋"
+                ? "No messages yet — say gm to the block 👋"
                 : "Chat is offline. It turns on automatically once a database is connected (set DATABASE_URL in Vercel — a free Neon Postgres works)."}
             </div>
           )}
@@ -160,7 +160,7 @@ export default function ChatPage() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder="Message the grid…"
+              placeholder="Message the block…"
               maxLength={240}
               className="flex-1 rounded-full border border-line bg-panel px-4 py-2.5 text-sm text-white placeholder:text-mute focus:border-mute/60 focus:outline-none"
             />

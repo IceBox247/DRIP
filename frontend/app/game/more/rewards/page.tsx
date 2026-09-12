@@ -18,7 +18,7 @@ export default function RewardsPage() {
       <div className="space-y-4">
         <Card title="The loser pot (USDG)">
           <Split rows={[
-            { pct: 90, label: "Winners", note: "pro-rata by stake on the winning tile — always", color: "bg-lime" },
+            { pct: 90, label: "Winners", note: "pro-rata by stake on the winning block — always", color: "bg-lime" },
             { pct: gridMine.loserCutBps / 100, label: "Protocol cut", note: "buys DRIP from the pool → split below", color: "bg-violet-400" },
           ]} />
           <p className="mt-3 text-xs text-mute">
@@ -41,7 +41,7 @@ export default function RewardsPage() {
           <p className="text-sm text-mute">
             The USDG pot is <span className="text-white">always</span> pro-rata. The round&rsquo;s DRIP and NVDA flip a
             coin together: <span className="text-white">50%</span> one weighted winner takes it all (incl. the
-            motherlode), <span className="text-white">50%</span> everyone on the tile shares.
+            motherlode), <span className="text-white">50%</span> everyone on the block shares.
           </p>
         </Card>
 
@@ -54,7 +54,7 @@ export default function RewardsPage() {
 
         <Card title="No-winner rounds">
           <p className="text-sm text-mute">
-            If the RNG lands on a tile nobody staked, the entire net pool buys DRIP and
+            If the RNG lands on a block nobody staked, the entire net pool buys DRIP and
             <span className="text-white"> 100% is burned</span>. Nothing is stranded, nothing goes to the team.
           </p>
         </Card>

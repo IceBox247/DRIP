@@ -9,7 +9,7 @@ export function Footer() {
           <div className="max-w-sm">
             <Logo className="text-white" />
             <p className="mt-3 text-sm text-mute">
-              A fair-launch token on {site.chain}, launched via {site.launchpad}. Mine the grid for
+              A fair-launch token on {site.chain}, launched via {site.launchpad}. Mine the blocks for
               USDG &amp; DRIP.
             </p>
           </div>

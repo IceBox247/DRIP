@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
-import { addresses, contractsReady, erc20Abi, ponsCurveAbi } from "@/lib/contracts";
-import { compact } from "@/lib/format";
+import { addresses, contractsReady, erc20Abi, ponsCurveAbi, robinhoodChain, CHAIN_ID } from "@/lib/contracts";
+import { useEnsureChain } from "@/lib/useEnsureChain";
+import { compact, friendlyError } from "@/lib/format";
 
 // Trade — REAL swap, both directions, straight against DRIP's Pons bonding curve:
 //   Buy  USDG → DRIP  via curve.buy(quoteIn, minTokensOut, you)  (approve USDG to the curve)
@@ -20,6 +21,7 @@ export default function TradePage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const ensureChain = useEnsureChain();
   const ready = contractsReady && !!addresses.curve && !!addresses.usdg && !!addresses.drip;
   const curveAddr = addresses.curve as `0x${string}`;
 
@@ -78,6 +80,7 @@ export default function TradePage() {
     if (!isConnected) { setMsg("Connect your wallet first."); return; }
     if (amount <= 0) { setMsg("Enter an amount."); return; }
     if (amount > fromBal) { setMsg(`Not enough ${fromTok}.`); return; }
+    if (!(await ensureChain())) { setMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
     setBusy(true); setMsg(null);
     try {
       const inRaw = dir === "buy" ? parseUnits(String(amount), 6) : parseUnits(String(amount), 18);
@@ -85,9 +88,9 @@ export default function TradePage() {
       const allowance = (dir === "buy" ? usdgAllowance.data : dripAllowance.data) as bigint | undefined;
       if ((allowance ?? BigInt(0)) < inRaw) {
         setMsg(`Approve ${fromTok}…`);
-        const h = await writeContractAsync({ address: token, abi: erc20Abi, functionName: "approve", args: [curveAddr, inRaw] }); // exact amount — no "unlimited" warning
+        const h = await writeContractAsync({ address: token, abi: erc20Abi, functionName: "approve", args: [curveAddr, inRaw], chainId: CHAIN_ID }); // exact amount — no "unlimited" warning
         setMsg("Waiting for approval…");
-        if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h });
+        try { if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h, timeout: 90_000, pollingInterval: 1_500 }); } catch { /* slow RPC — the send below will revert if the approval truly didn't land */ }
       }
       // Exact quote via simulation → min-out with slippage.
       setMsg("Fetching quote…");
@@ -102,13 +105,13 @@ export default function TradePage() {
       setMsg(dir === "buy" ? "Buying DRIP…" : "Selling DRIP…");
       await writeContractAsync({
         address: curveAddr, abi: ponsCurveAbi, functionName: dir === "buy" ? "buy" : "sell",
-        args: [inRaw, minOut, address as `0x${string}`],
+        args: [inRaw, minOut, address as `0x${string}`], chainId: CHAIN_ID,
       });
       setMsg(dir === "buy" ? "Bought DRIP ✓" : "Sold DRIP ✓");
       setAmount(0); setEst(null);
       setTimeout(() => { usdgBal.refetch(); dripBal.refetch(); usdgAllowance.refetch(); dripAllowance.refetch(); tokenReserve.refetch(); quoteReserve.refetch(); }, 3000);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message.slice(0, 120) : "swap failed");
+      setMsg(friendlyError(e, "Swap failed — please try again."));
     } finally {
       setBusy(false);
     }

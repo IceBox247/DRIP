@@ -19,8 +19,8 @@ export default function AboutPage() {
           <p>
             <span className="text-white">{site.ticker}</span> is a fair-launch token and on-chain game
             on <span className="text-white">{site.chain}</span>, launched via the{" "}
-            <span className="text-white">{site.launchpad}</span> launchpad. Its core loop, Grid Mine, is
-            adapted from ORE: a fast 5×5 game where players deploy USDG onto tiles and the losing stake is
+            <span className="text-white">{site.launchpad}</span> launchpad. Its core loop, Block Mine, is
+            adapted from ORE: a fast 5×5 game where players deploy USDG onto blocks and the losing stake is
             redistributed to the winners every round.
           </p>
         </Section>
@@ -43,16 +43,16 @@ export default function AboutPage() {
           <p>Mining is how you play — and how value moves each round.</p>
           <h3 className="mt-4 text-base font-semibold text-white">How it works</h3>
           <p className="mt-1.5">
-            Each round, miners have {gridMine.roundSeconds} seconds to deploy USDG onto tiles of a 5×5 grid. At
-            the close, a secure on-chain RNG picks one winning tile ({`1 / ${gridMine.tiles}`}). All USDG on the
-            losing tiles is split among the winners in proportion to their stake on the winning tile. A flat{" "}
+            Each round, miners have {gridMine.roundSeconds} seconds to deploy USDG onto blocks of a 5×5 board. At
+            the close, a secure on-chain RNG picks one winning block ({`1 / ${gridMine.tiles}`}). All USDG on the
+            losing blocks is split among the winners in proportion to their stake on the winning block. A flat{" "}
             {gridMine.adminFeeBps / 100}% entry fee is skimmed at deploy, before funds enter the pool, so it never
             touches the win/loss math.
           </p>
           <h3 className="mt-4 text-base font-semibold text-white">1-or-all</h3>
           <p className="mt-1.5">
             The USDG pot is always pro-rata. The round&rsquo;s DRIP flips a coin: half the time one weighted winner
-            takes it all; half the time everyone on the tile shares.
+            takes it all; half the time everyone on the block shares.
           </p>
           <h3 className="mt-4 text-base font-semibold text-white">Motherlode</h3>
           <p className="mt-1.5">
@@ -134,7 +134,7 @@ export default function AboutPage() {
         </Section>
 
         <p className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-xs">
-          <span className="font-semibold text-yellow-500">Honest note.</span> Grid Mine is a real-money game of
+          <span className="font-semibold text-yellow-500">Honest note.</span> Block Mine is a real-money game of
           chance by design, and this is a pre-launch demo. Nothing runs on mainnet until secure randomness and legal
           review are in place. See <Link href="/game/more/shield" className="text-lime hover:underline">Shield</Link>.
         </p>

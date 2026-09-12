@@ -4,10 +4,10 @@ import { MorePage } from "@/components/MorePage";
 export const metadata = { title: "Shield — Drip" };
 
 const guards = [
-  { title: "Unpredictable winner", body: "The winning tile comes from a secure RNG (VRF or bonded commit–reveal). The winner is never derived from block hash or timestamp alone.", state: "in progress" },
-  { title: "Owner can't pick", body: "No admin function selects a tile or a winner. The contract has no owner key over round outcomes.", state: "by design" },
+  { title: "Unpredictable winner", body: "The winning block comes from a secure RNG (VRF or bonded commit–reveal). The winner is never derived from block hash or timestamp alone.", state: "in progress" },
+  { title: "Owner can't pick", body: "No admin function selects a block or a winner. The contract has no owner key over round outcomes.", state: "by design" },
   { title: "Entry fee can't skew odds", body: "The 1% fee is skimmed at deploy, before funds enter the pool, so it never touches the win/loss math.", state: "shipped" },
-  { title: "You can't win from yourself", body: "A lone player who covers the winning tile just gets their net stake back — the loser pot is zero, so no cut and no buyback.", state: "shipped" },
+  { title: "You can't win from yourself", body: "A lone player who covers the winning block just gets their net stake back — the loser pot is zero, so no cut and no buyback.", state: "shipped" },
   { title: "Fixed supply", body: "DRIP is never minted. Every reward is bought from the market, so the game can't inflate the token.", state: "shipped" },
   { title: "Slippage-bounded buyback", body: "The cut→DRIP swap is a permissionless keeper step with a caller-supplied minimum out, so it can't be sandwiched into a bad fill.", state: "shipped" },
 ];
