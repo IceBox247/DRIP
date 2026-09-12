@@ -5,7 +5,7 @@ import { useAccount, useDisconnect, usePublicClient, useReadContract, useWriteCo
 import { parseUnits } from "viem";
 import { AppChrome } from "@/components/AppChrome";
 import { Faucet } from "@/components/Faucet";
-import { addresses, contractsReady, gridMineAbi, erc20Abi, robinhoodChain, CHAIN_ID } from "@/lib/contracts";
+import { addresses, contractsReady, gridMineAbi, erc20Abi, autoMineVaultAbi, robinhoodChain, CHAIN_ID } from "@/lib/contracts";
 import { useEnsureChain } from "@/lib/useEnsureChain";
 import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
@@ -73,6 +73,24 @@ export default function MinePage() {
     args: address && addresses.gridMine ? [address, addresses.gridMine as `0x${string}`] : undefined,
     query: { enabled: live && !!address && !!addresses.usdg, refetchInterval: 10000 },
   });
+  // Auto-mine vault (one-signature auto-mining). Only wired when the vault is deployed + configured via
+  // NEXT_PUBLIC_AUTOMINE_ADDRESS; otherwise auto-mine falls back to the sign-per-round path below.
+  const vaultReady = live && !!addresses.autoMineVault;
+  const vaultAddr = addresses.autoMineVault as `0x${string}`;
+  const vaultAllowance = useReadContract({
+    address: (addresses.usdg || undefined) as `0x${string}` | undefined,
+    abi: erc20Abi, functionName: "allowance",
+    args: address && vaultReady ? [address, vaultAddr] : undefined,
+    query: { enabled: vaultReady && !!address && !!addresses.usdg, refetchInterval: 10000 },
+  });
+  const vaultPlan = useReadContract({
+    address: vaultReady ? vaultAddr : undefined, abi: autoMineVaultAbi, functionName: "planOf",
+    args: address ? [address] : undefined,
+    query: { enabled: vaultReady && !!address, refetchInterval: 6000 },
+  });
+  const planData = vaultPlan.data as readonly [readonly number[], bigint, number, bigint, bigint] | undefined;
+  const planRoundsLeft = planData ? Number(planData[2]) : 0;
+  const planBalance = planData ? Number(planData[3]) / 1e6 : 0; // USDG left on deposit
   // Real winnings reads: refinable DRIP (RefiningVault.claimable), + DRIP/NVDA wallet balances.
   const refiningClaimable = useReadContract({
     address: (addresses.refining || undefined) as `0x${string}` | undefined,
@@ -101,6 +119,9 @@ export default function MinePage() {
   const autoCfg = useRef<{ tiles: number[]; amount: number }>({ tiles: [], amount: 0 });
   const lastAutoRound = useRef(0); // guard: at most one auto-deploy per round
   const autoBusy = useRef(false); // guard: never overlap two auto-deploys
+  // Unified "is auto-mine running / how many rounds left" across vault mode and the sign-per-round fallback.
+  const autoRunning = vaultReady ? planRoundsLeft > 0 : autoLeft > 0;
+  const autoRoundsLeftShown = vaultReady ? planRoundsLeft : autoLeft;
   // Live winning-tile reveal: when a round settles on-chain, flash across the grid, land on the REAL
   // winning tile, and hold it for ~3s — so players SEE the result on the grid, not only in history.
   const [liveWin, setLiveWin] = useState<{ round: number; tile: number; motherlodeHit: boolean } | null>(null);
@@ -258,24 +279,74 @@ export default function MinePage() {
     if (ok) setSelected([]);
   };
 
-  // Start auto-mining the current selection + amount for `autoRounds` rounds. The first deploy approves
-  // enough USDG for ALL of them, so the rest just re-deploy each round.
+  // Start auto-mining the current selection + amount for `autoRounds` rounds.
+  //  • Vault mode (one signature): deposit USDG for all rounds into the AutoMineVault + set the plan;
+  //    the keeper then mines each round on your behalf — no more signing.
+  //  • Fallback (no vault deployed): approve once, then re-deploy each round with a quick confirm.
   const startAuto = async () => {
     if (!live) { setTxMsg("Auto-mine runs on-chain — not in demo."); return; }
     if (!isConnected) { setTxMsg("Connect your wallet to auto-mine."); return; }
     if (targets.length === 0) { setTxMsg("Select blocks first, then start auto-mine."); return; }
     if (amount <= 0) { setTxMsg("Enter an amount first."); return; }
+
+    if (vaultReady) {
+      if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
+      try {
+        const perTile = parseUnits(String(amount), 6);
+        if (perTile === BigInt(0)) { setTxMsg("Enter an amount greater than 0."); return; }
+        const need = perTile * BigInt(targets.length) * BigInt(Math.max(1, autoRounds));
+        const cur = (vaultAllowance.data as bigint | undefined) ?? BigInt(0);
+        if (cur < need) {
+          setTxMsg("Approve USDG for auto-mine…");
+          const h = await writeContractAsync({
+            address: addresses.usdg as `0x${string}`, abi: erc20Abi, functionName: "approve",
+            args: [vaultAddr, need], chainId: CHAIN_ID,
+          });
+          setTxMsg("Waiting for approval…");
+          try { if (publicClient) await publicClient.waitForTransactionReceipt({ hash: h, timeout: 90_000, pollingInterval: 1_500 }); } catch { /* verify below */ }
+          await vaultAllowance.refetch();
+        }
+        setTxMsg("Starting auto-mine…");
+        await writeContractAsync({
+          address: vaultAddr, abi: autoMineVaultAbi, functionName: "configure",
+          args: [targets.map((t) => t), perTile, autoRounds], chainId: CHAIN_ID,
+        });
+        setTxMsg(`Auto-mine started · ${autoRounds} round${autoRounds > 1 ? "s" : ""} — mining hands-off.`);
+        setSelected([]);
+        setTimeout(() => { vaultPlan.refetch(); vaultAllowance.refetch(); }, 3000);
+      } catch (e) {
+        setTxMsg(friendlyError(e, "Couldn't start auto-mine — please try again."));
+      }
+      return;
+    }
+
+    // Fallback: sign-per-round.
     const cfg = { tiles: [...targets], amount };
     autoCfg.current = cfg;
     lastAutoRound.current = chain.round; // this round is the first of the run
     const ok = await runDeploy(cfg.tiles, cfg.amount, autoRounds);
     if (ok) { setSelected([]); setAutoLeft(Math.max(0, autoRounds - 1)); }
   };
-  const stopAuto = () => { setAutoLeft(0); setTxMsg("Auto-mine stopped."); };
+  const stopAuto = async () => {
+    if (vaultReady) {
+      if (!(await ensureChain())) { setTxMsg(`Switch your wallet to ${robinhoodChain.name} and try again.`); return; }
+      try {
+        setTxMsg("Stopping auto-mine & returning USDG…");
+        await writeContractAsync({ address: vaultAddr, abi: autoMineVaultAbi, functionName: "withdraw", chainId: CHAIN_ID });
+        setTxMsg("Auto-mine stopped — unspent USDG returned to your wallet.");
+        setTimeout(() => { vaultPlan.refetch(); vaultAllowance.refetch(); }, 3000);
+      } catch (e) {
+        setTxMsg(friendlyError(e, "Couldn't stop auto-mine — please try again."));
+      }
+      return;
+    }
+    setAutoLeft(0); setTxMsg("Auto-mine stopped.");
+  };
 
   // Round-watcher: when a new round opens and auto-mine still has rounds left, re-deploy the saved
   // config. Guards keep it to exactly one deploy per round and never overlapping.
   useEffect(() => {
+    if (vaultReady) return; // vault mode: the keeper mines each round, no local sign-per-round loop
     if (!live || !isConnected || autoLeft <= 0 || !chainReady) return;
     const r = chain.round;
     if (r <= 1 || r === lastAutoRound.current || autoBusy.current) return;
@@ -291,7 +362,7 @@ export default function MinePage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain.round, autoLeft, live, isConnected, chainReady]);
+  }, [chain.round, autoLeft, live, isConnected, chainReady, vaultReady]);
 
   // Play the winning-tile reveal on the live grid: flash across tiles, land on the real winner, hold.
   const startLiveReveal = useCallback((round: number, tile: number, motherlodeHit: boolean) => {
@@ -751,7 +822,7 @@ export default function MinePage() {
                 </div>
               </Row>
             )}
-            <Row label="ROUNDS"><span className="font-semibold text-white">{autoLeft > 0 ? `${autoLeft} left` : autoMode ? autoRounds : 1}</span></Row>
+            <Row label="ROUNDS"><span className="font-semibold text-white">{autoRunning ? `${autoRoundsLeftShown} left` : autoMode ? autoRounds : 1}</span></Row>
             <Row label="PER BLOCK">
               <span className="flex items-center gap-1 font-semibold text-white"><Usdg /> {fmt(amount, amount % 1 ? 2 : 0)}</span>
             </Row>
@@ -776,7 +847,7 @@ export default function MinePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-white">Auto-mine ⛏️</div>
-                  <div className="text-[11px] text-mute">Re-deploy your blocks every round automatically.</div>
+                  <div className="text-[11px] text-mute">{vaultReady ? "Deposit once — it mines every round for you, hands-off." : "Re-deploy your blocks every round — one quick confirm each."}</div>
                 </div>
                 <button role="switch" aria-checked={autoMode} aria-label="Toggle auto-mine"
                   onClick={() => setAutoMode((v) => !v)}
@@ -785,7 +856,7 @@ export default function MinePage() {
                 </button>
               </div>
 
-              {autoMode && autoLeft <= 0 && (
+              {autoMode && !autoRunning && (
                 <>
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-wide text-mute">Rounds</span>
@@ -801,26 +872,29 @@ export default function MinePage() {
                     </div>
                   </div>
                   <div className="mt-2 text-[11px] leading-relaxed text-mute">
-                    Est. spend <span className="font-semibold text-white">{fmt(amount * Math.max(1, targets.length) * autoRounds, 2)} USDG</span> over {autoRounds} round{autoRounds > 1 ? "s" : ""} ({fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}/round). You approve USDG once; each round is a quick confirm in your wallet. Stops automatically after {autoRounds} round{autoRounds > 1 ? "s" : ""} or if funds run out.
+                    Deposit <span className="font-semibold text-white">{fmt(amount * Math.max(1, targets.length) * autoRounds, 2)} USDG</span> for {autoRounds} round{autoRounds > 1 ? "s" : ""} ({fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}/round).{" "}
+                    {vaultReady
+                      ? "You approve + start ONCE; then it mines every round automatically — no more signing. Stop anytime to get unspent USDG back."
+                      : "You approve USDG once; each round is a quick confirm in your wallet. Stops automatically after the last round or if funds run out."}
                   </div>
                 </>
               )}
 
-              {autoLeft > 0 && (
+              {autoRunning && (
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-lime/40 bg-lime/10 px-3 py-2 text-sm font-semibold text-white">
                   <span className="h-2 w-2 animate-ping rounded-full bg-lime" />
-                  Auto-mining · {autoLeft} round{autoLeft > 1 ? "s" : ""} left
+                  Auto-mining · {autoRoundsLeftShown} round{autoRoundsLeftShown > 1 ? "s" : ""} left{vaultReady && planBalance > 0 ? ` · ${fmt(planBalance, 2)} USDG on deposit` : ""}
                 </div>
               )}
             </div>
           )}
 
           <button
-            disabled={autoLeft > 0 ? false : !canDeploy}
-            onClick={autoLeft > 0 ? stopAuto : autoMode ? startAuto : doDeploy}
-            className={`mt-3 w-full rounded-2xl py-4 text-base font-semibold transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute ${autoLeft > 0 ? "border border-line bg-panel text-white" : "bg-lime text-ink"}`}>
-            {autoLeft > 0
-              ? `Stop auto-mine · ${autoLeft} left`
+            disabled={autoRunning ? false : !canDeploy}
+            onClick={autoRunning ? stopAuto : autoMode ? startAuto : doDeploy}
+            className={`mt-3 w-full rounded-2xl py-4 text-base font-semibold transition-transform enabled:hover:scale-[1.01] disabled:cursor-not-allowed disabled:bg-panel disabled:text-mute ${autoRunning ? "border border-line bg-panel text-white" : "bg-lime text-ink"}`}>
+            {autoRunning
+              ? `Stop auto-mine · ${autoRoundsLeftShown} left`
               : autoMode
               ? (live && !isConnected
                   ? "Connect wallet to auto-mine"
