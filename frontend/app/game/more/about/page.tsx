@@ -20,8 +20,8 @@ export default function AboutPage() {
             <span className="text-white">{site.ticker}</span> is a fair-launch token and on-chain game
             on <span className="text-white">{site.chain}</span>, launched via the{" "}
             <span className="text-white">{site.launchpad}</span> launchpad. Its core loop, Block Mine, is
-            adapted from ORE: a fast 5×5 game where players deploy USDG onto blocks and the losing stake is
-            redistributed to the winners every round.
+            a fast 5×5 mining game where players deploy USDG onto blocks and the stake on the blocks that
+            miss is redistributed to the block that strikes every dig.
           </p>
         </Section>
 

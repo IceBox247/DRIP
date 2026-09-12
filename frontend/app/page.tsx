@@ -10,7 +10,7 @@ import { site } from "@/lib/site";
 
 const steps = [
   { n: "01", t: "Deploy miners", d: "Stake USDG on any of the 25 blocks before the dig seals." },
-  { n: "02", t: "One block strikes ore", d: "A secure on-chain RNG picks it — 1-in-25. Verifiable, nobody can rig it." },
+  { n: "02", t: "One block strikes", d: "A secure on-chain RNG picks it — 1-in-25. Verifiable, nobody can rig it." },
   { n: "03", t: "Its miners split the haul", d: "The other blocks' USDG flows to the block that struck, pro-rata, in USDG." },
   { n: "04", t: "Buy, burn, refine", d: "A 10% cut buys DRIP — burned, staked, and paid to the miners who struck." },
 ];
@@ -34,7 +34,7 @@ export default function Home() {
                 </h1>
 
                 <p className="mt-6 max-w-md text-lg leading-relaxed text-mute">
-                  A new dig every 60 seconds. Stake USDG on the blocks — one strikes ore, and its
+                  A new dig every 60 seconds. Stake USDG on the blocks — one strikes DRIP, and its
                   miners split the haul. Nothing is minted; the team holds zero.
                 </p>
 

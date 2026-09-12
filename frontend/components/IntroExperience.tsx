@@ -196,13 +196,13 @@ function ScenePremise() {
   const truths = [
     { k: "0%", v: "team allocation", d: "Fair launch. The team holds no tokens." },
     { k: "0", v: "tokens minted", d: "Nothing is printed. Supply only ever burns." },
-    { k: "1-in-25", v: "on-chain RNG", d: "A block strikes ore by verifiable randomness. Nobody can rig it." },
+    { k: "1-in-25", v: "on-chain RNG", d: "A block is struck by verifiable randomness. Nobody can rig it." },
   ];
   return (
     <div className="text-center">
       <p className="rise rise-1 text-sm font-semibold uppercase tracking-[0.3em] text-lime">The idea</p>
       <h2 className="rise rise-2 mx-auto mt-4 max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-5xl">
-        Stake on a block. If it strikes ore, you take the haul —
+        Stake on a block. If it strikes, you take the haul —
         <span className="text-lime"> in real USDG and DRIP.</span>
       </h2>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -248,7 +248,7 @@ function SceneMechanic() {
       <div className="order-2 text-center lg:order-1 lg:text-left">
         <p className="rise rise-1 text-sm font-semibold uppercase tracking-[0.3em] text-lime">How it plays</p>
         <h2 className="rise rise-2 mt-4 text-3xl font-semibold leading-tight text-white sm:text-5xl">
-          25 blocks.<br />One strikes ore.<br />Every 60 seconds.
+          25 blocks.<br />One strikes.<br />Every 60 seconds.
         </h2>
         <p className="rise rise-3 mt-5 max-w-md text-base leading-relaxed text-mute lg:mx-0">
           Deploy USDG onto the blocks you feel. When the dig seals, on-chain RNG lights one up —
@@ -353,7 +353,7 @@ function SceneCTA({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="text-center">
       <h2 className="rise rise-1 mx-auto max-w-3xl text-4xl font-bold leading-tight text-white sm:text-6xl">
-        A block strikes ore every 60 seconds.
+        A block strikes every 60 seconds.
         <br />
         <span className="shimmer">Make the next one yours.</span>
       </h2>

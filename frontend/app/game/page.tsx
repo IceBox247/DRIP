@@ -629,10 +629,10 @@ export default function MinePage() {
       {live && chainReady && roundShown > 1 && timeShown === 0 && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="h-2 w-2 animate-ping rounded-full bg-lime" /> Dig #{roundShown} sealed — distributing ore…
+            <span className="h-2 w-2 animate-ping rounded-full bg-lime" /> Dig #{roundShown} sealed — distributing the haul…
           </div>
           <div className="mt-1 text-[11px] text-mute">
-            The keeper is reading which block struck ore, buying &amp; distributing DRIP/NVDA, and opening the next dig — or just deploy again to jump into a fresh one.
+            The keeper is reading which block struck, buying &amp; distributing DRIP/NVDA, and opening the next dig — or just deploy again to jump into a fresh one.
           </div>
           {/* Settling is permissionless: if the keeper is slow, ANY connected player can push the round
               over (and process its rewards) so it doesn't hang. Costs a little gas; optional. */}
@@ -650,7 +650,7 @@ export default function MinePage() {
       {revealing && (
         <div className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-sm font-semibold text-white">
           <span className="h-2 w-2 animate-ping rounded-full bg-lime" />
-          Reading which block struck ore…
+          Reading which block struck…
         </div>
       )}
 

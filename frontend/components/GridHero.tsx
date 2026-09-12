@@ -56,7 +56,7 @@ export function GridHero() {
         <span>
           Struck block <span className="font-semibold text-lime">#{winner}</span>
         </span>
-        <span>ore haul → miners + buyback</span>
+        <span>haul → miners + buyback</span>
       </div>
     </div>
   );
