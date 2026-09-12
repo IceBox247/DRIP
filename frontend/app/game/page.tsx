@@ -593,20 +593,34 @@ export default function MinePage() {
       {/* Deploy panel */}
       {!busy && (
         <div className="px-4 pt-6">
+          {/* Amount field — made to LOOK like a tappable input (bordered box, label, edit hint) so
+              players realise this is where they type the amount. Pulses only while empty. */}
           <div className="text-center">
-            {/* Editable — tap to type any amount, or use the quick buttons below. */}
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              value={amount || ""}
-              onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
-              placeholder="0"
-              aria-label="Deploy amount in USDG"
-              className="w-full bg-transparent text-center text-5xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <div className="mt-1 flex justify-center"><Usdg big /></div>
+            <label htmlFor="deploy-amount" className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-mute">
+              Amount to add per block · tap to edit
+            </label>
+            <label htmlFor="deploy-amount"
+              className={`mx-auto flex w-full max-w-xs cursor-text items-center justify-center gap-2 rounded-2xl border-2 bg-panel/40 px-4 py-3 transition-colors focus-within:border-lime focus-within:bg-panel/70 ${amount > 0 ? "border-line" : "border-lime/60 animate-pulse"}`}>
+              <Usdg big />
+              <input
+                id="deploy-amount"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="any"
+                value={amount || ""}
+                onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
+                aria-label="Amount of USDG to add per block"
+                className="w-full min-w-0 bg-transparent text-center text-5xl font-semibold tracking-tight text-white placeholder:text-mute/40 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              {/* Pencil affordance so it's unmistakably editable. */}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+                className="shrink-0 text-mute" aria-hidden="true">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
+            </label>
+            <p className="mt-2 text-[11px] text-mute">Type any amount, or use the quick buttons below.</p>
           </div>
           <div className="mt-5 grid grid-cols-4 gap-2">
             {[
