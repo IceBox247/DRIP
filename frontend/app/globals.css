@@ -45,6 +45,17 @@ body {
     #06070a;
 }
 
+/* Industrial mine backdrop: deep near-black with a restrained top light + depth at the edges. */
+.mine-veil {
+  background:
+    radial-gradient(70% 45% at 50% -5%, rgba(198, 242, 78, 0.10), transparent 62%),
+    linear-gradient(180deg, #08090c 0%, #060709 55%, #030405 100%);
+}
+/* A faint diagonal shaft of light, as if from above — static, subtle, not "pretty". */
+.shaft-light {
+  background: linear-gradient(115deg, transparent 30%, rgba(198, 242, 78, 0.05) 46%, rgba(198, 242, 78, 0.02) 52%, transparent 60%);
+}
+
 /* Slow drifting aurora behind a scene. */
 .aurora {
   background:
