@@ -98,6 +98,11 @@ export default function MinePage() {
   const autoCfg = useRef<{ tiles: number[]; amount: number }>({ tiles: [], amount: 0 });
   const lastAutoRound = useRef(0); // guard: at most one auto-deploy per round
   const autoBusy = useRef(false); // guard: never overlap two auto-deploys
+  // Live winning-tile reveal: when a round settles on-chain, flash across the grid, land on the REAL
+  // winning tile, and hold it for ~3s — so players SEE the result on the grid, not only in history.
+  const [liveWin, setLiveWin] = useState<{ round: number; tile: number; motherlodeHit: boolean } | null>(null);
+  const prevRoundRef = useRef(0); // last round number we saw (to detect a settle)
+  const revealBusyRef = useRef(false); // guard against overlapping reveals
   const [mode, setMode] = useState<"lite" | "pro">("pro");
   const [tiles, setTiles] = useState<Tile[]>(empty);
   const [selected, setSelected] = useState<number[]>([]);
@@ -270,6 +275,50 @@ export default function MinePage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain.round, autoLeft, live, isConnected, chainReady]);
+
+  // Play the winning-tile reveal on the live grid: flash across tiles, land on the real winner, hold.
+  const startLiveReveal = useCallback((round: number, tile: number, motherlodeHit: boolean) => {
+    if (revealBusyRef.current) return;
+    revealBusyRef.current = true;
+    setLiveWin(null);
+    setRevealing(true);
+    let ticks = 0;
+    const iv = setInterval(() => {
+      ticks++;
+      setRevealTile(Math.floor(Math.random() * N));
+      if (ticks >= 18) {
+        clearInterval(iv);
+        setRevealTile(tile); // land on the actual winning tile
+        setTimeout(() => {
+          setRevealing(false);
+          setRevealTile(null);
+          setLiveWin({ round, tile, motherlodeHit }); // hold the highlight + banner
+          setTimeout(() => { setLiveWin(null); revealBusyRef.current = false; }, 3000);
+        }, 700);
+      }
+    }, 110);
+  }, []);
+
+  // Watch the live round number: when it advances (a round just settled), look up that round's REAL
+  // winning tile and play the reveal on the grid. Skips the very first read so it doesn't fire on load.
+  useEffect(() => {
+    if (!live || !chainReady) return;
+    const r = chain.round;
+    if (prevRoundRef.current === 0) { prevRoundRef.current = r; return; }
+    if (r <= prevRoundRef.current) return;
+    const settled = prevRoundRef.current; // the round that just ended
+    prevRoundRef.current = r;
+    if (settled < 1 || !publicClient || !addresses.gridMine) return;
+    (async () => {
+      try {
+        const g = (await publicClient.readContract({
+          address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "getRound", args: [BigInt(settled)],
+        })) as { status: number; winningTile: number; motherlodeHit: boolean };
+        if (g.status === 2) startLiveReveal(settled, Number(g.winningTile), g.motherlodeHit);
+      } catch { /* couldn't read the settled round — skip the reveal, no harm */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chain.round, live, chainReady]);
 
   // Settle the finished round and process its rewards (the keeper's job — this button drives it while
   // testing): seed a fresh random word, closeRound() (picks the winner, opens the next round), then
@@ -515,6 +564,16 @@ export default function MinePage() {
         </div>
       )}
 
+      {/* Live winner — held for ~3s on the grid after the reveal lands, so players SEE which tile won. */}
+      {liveWin && !revealing && (
+        <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-center">
+          <div className="text-sm font-semibold text-white">
+            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "🎉 "}Tile #{liveWin.tile} won round #{liveWin.round}
+          </div>
+          <div className="mt-0.5 text-[11px] text-mute">A fresh round is live — deploy to jump in.</div>
+        </div>
+      )}
+
       {result && (
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
           <div className="font-semibold text-white">Round #{round} — tile {result.tile} won{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
@@ -576,13 +635,16 @@ export default function MinePage() {
                 const sel = selected.includes(i);
                 const total = t.mine + t.others;
                 const lit = revealing && revealTile === i; // the flashing highlight during the reveal
+                const won = !revealing && liveWin?.tile === i; // the winning tile, held after the reveal
                 return (
                   <button key={i} onClick={() => toggle(i)}
                     className={`relative aspect-square rounded-xl border transition-all duration-100 ${
                       lit ? "scale-105 border-lime bg-lime/25 ring-2 ring-lime"
+                        : won ? "scale-105 border-lime bg-lime/20 ring-2 ring-lime"
                         : sel ? "border-white ring-1 ring-white/60"
                         : "border-line bg-panel/40 hover:border-mute/50"
-                    } ${t.mine > 0 && !lit ? "bg-lime/5" : ""} ${revealing && !lit ? "opacity-50" : ""}`}>
+                    } ${t.mine > 0 && !lit && !won ? "bg-lime/5" : ""} ${revealing && !lit ? "opacity-50" : ""}`}>
+                    {won && <span className="absolute right-1 top-1 text-xs">🏆</span>}
                     {!live && sparkles[i] && <span className="absolute right-1 top-1 text-[8px] text-white/50">✦</span>}
                     {/* Your own stake on this tile (top) — shown above the tile's total (bottom), like ORE. */}
                     {t.mine > 0 && (
