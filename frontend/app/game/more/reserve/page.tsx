@@ -5,9 +5,9 @@ import { gridMine } from "@/lib/site";
 export const metadata = { title: "Reserve — Drip" };
 
 const pools = [
-  { name: "Motherlode", value: "26.4 DRIP", note: `Accrues 10% of every cut. A 1/${gridMine.motherlodeOdds} hit dumps the whole jackpot to that round's winners.`, tag: "jackpot" },
+  { name: "Motherlode", value: "26.4 DRIP", note: `Accrues 10% of every cut. A 1/${gridMine.motherlodeOdds} strike dumps the whole motherlode to that dig's miners.`, tag: "motherlode" },
   { name: "StakeVault", value: "1.24M DRIP", note: "Holds staked DRIP and streams the stakers' 10% slice of every buyback (Synthetix accumulator).", tag: "staking" },
-  { name: "RefiningVault", value: "312K DRIP", note: `Holds winners' bought DRIP until claimed. Claiming taxes ${gridMine.refineFeeBps / 100}% to unclaimed holders.`, tag: "winnings" },
+  { name: "RefiningVault", value: "312K DRIP", note: `Holds miners' bought DRIP until claimed. Claiming taxes ${gridMine.refineFeeBps / 100}% to unclaimed holders.`, tag: "haul" },
   { name: "Marketing", value: "4,180 USDG", note: `The ${gridMine.adminFeeBps / 100}% entry fee, skimmed at deploy. Permissionless withdraw to the ops wallet.`, tag: "ops" },
 ];
 

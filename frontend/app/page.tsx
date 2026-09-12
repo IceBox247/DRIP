@@ -9,10 +9,10 @@ import { site } from "@/lib/site";
 // The old passive hash-rate/reserve/referrals model was retired for Grid Mine; keep this lean.
 
 const steps = [
-  { n: "01", t: "Deploy", d: "Stake USDG onto any of the 25 tiles before the round closes." },
-  { n: "02", t: "One block wins", d: "A secure on-chain RNG picks it — 1-in-25. Nobody can rig it." },
-  { n: "03", t: "Winners split the pot", d: "Losers' USDG goes to the winning block, pro-rata, in USDG." },
-  { n: "04", t: "Buy, burn, refine", d: "A 10% cut buys DRIP — burned, staked, and paid to winners." },
+  { n: "01", t: "Deploy miners", d: "Stake USDG on any of the 25 blocks before the dig seals." },
+  { n: "02", t: "One block strikes ore", d: "A secure on-chain RNG picks it — 1-in-25. Verifiable, nobody can rig it." },
+  { n: "03", t: "Its miners split the haul", d: "The other blocks' USDG flows to the block that struck, pro-rata, in USDG." },
+  { n: "04", t: "Buy, burn, refine", d: "A 10% cut buys DRIP — burned, staked, and paid to the miners who struck." },
 ];
 
 export default function Home() {
@@ -34,7 +34,8 @@ export default function Home() {
                 </h1>
 
                 <p className="mt-6 max-w-md text-lg leading-relaxed text-mute">
-                  A round every 60 seconds. One block wins. Nothing is minted, the team holds zero.
+                  A new dig every 60 seconds. Stake USDG on the blocks — one strikes ore, and its
+                  miners split the haul. Nothing is minted; the team holds zero.
                 </p>
 
                 <div className="mt-8 flex items-center gap-5">
@@ -53,8 +54,8 @@ export default function Home() {
                 </div>
 
                 <p className="mt-5 text-xs text-mute/70">
-                  A game of chance, played on-chain. Demo uses fake funds — not launched, not
-                  available where prohibited.
+                  Provably-fair on-chain mining on Robinhood Chain. Demo uses test funds — not
+                  launched, not available where prohibited.
                 </p>
               </div>
 

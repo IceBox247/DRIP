@@ -177,7 +177,7 @@ export default function StakePage() {
           </div>
         </div>
         <p className="mt-8 text-center text-[11px] text-mute/60">
-          On-chain · Robinhood Chain. Rewards accrue as the game buys DRIP each round.
+          On-chain · Robinhood Chain. Rewards accrue as the game buys DRIP each dig.
         </p>
       </div>
     </AppChrome>

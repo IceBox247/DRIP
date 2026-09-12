@@ -185,7 +185,7 @@ function SceneIgnition() {
         Hold DRIP. <span className="text-white">Mine tokenized stock.</span>
       </p>
       <p className="rise rise-3 mt-3 text-sm text-mute/70">
-        On {site.chain} · a round every 60 seconds
+        On {site.chain} · a new dig every 60 seconds
       </p>
     </div>
   );
@@ -196,13 +196,13 @@ function ScenePremise() {
   const truths = [
     { k: "0%", v: "team allocation", d: "Fair launch. The team holds no tokens." },
     { k: "0", v: "tokens minted", d: "Nothing is printed. Supply only ever burns." },
-    { k: "1-in-25", v: "on-chain RNG", d: "A block wins by verifiable randomness. Nobody can rig it." },
+    { k: "1-in-25", v: "on-chain RNG", d: "A block strikes ore by verifiable randomness. Nobody can rig it." },
   ];
   return (
     <div className="text-center">
       <p className="rise rise-1 text-sm font-semibold uppercase tracking-[0.3em] text-lime">The idea</p>
       <h2 className="rise rise-2 mx-auto mt-4 max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-5xl">
-        Stake on a block. If it wins, you take the pot —
+        Stake on a block. If it strikes ore, you take the haul —
         <span className="text-lime"> in real USDG and DRIP.</span>
       </h2>
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -248,21 +248,21 @@ function SceneMechanic() {
       <div className="order-2 text-center lg:order-1 lg:text-left">
         <p className="rise rise-1 text-sm font-semibold uppercase tracking-[0.3em] text-lime">How it plays</p>
         <h2 className="rise rise-2 mt-4 text-3xl font-semibold leading-tight text-white sm:text-5xl">
-          25 blocks.<br />One winner.<br />Every 60 seconds.
+          25 blocks.<br />One strikes ore.<br />Every 60 seconds.
         </h2>
         <p className="rise rise-3 mt-5 max-w-md text-base leading-relaxed text-mute lg:mx-0">
-          Deploy USDG onto the blocks you feel. When the round closes, on-chain RNG lights one up —
-          and everyone who staked it splits the losers&rsquo; pot pro-rata.
+          Deploy USDG onto the blocks you feel. When the dig seals, on-chain RNG lights one up —
+          and everyone who staked it splits the haul pro-rata.
         </p>
         <div className="rise rise-4 mt-6 inline-flex items-center gap-2 rounded-full border border-lime/40 bg-lime/10 px-4 py-1.5 text-sm font-semibold text-lime">
-          <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" /> Live · round {round}
+          <span className="h-2 w-2 rounded-full bg-lime animate-pulseDot" /> Live · dig {round}
         </div>
       </div>
 
       <div className="order-1 mx-auto w-full max-w-sm lg:order-2">
         <div className="rounded-3xl border border-line bg-panel/60 p-4 backdrop-blur sm:p-5">
           <div className="mb-3 flex items-center justify-between text-xs text-mute">
-            <span className="font-mono">POT {pot} USDG</span>
+            <span className="font-mono">HAUL {pot} USDG</span>
             <span className="font-mono">25 blocks · 60s</span>
           </div>
           <div className="grid grid-cols-5 gap-1.5" aria-hidden="true">
@@ -287,7 +287,7 @@ function SceneMechanic() {
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-mute">Winning block</span>
             <span className={`font-semibold transition-colors ${reveal ? "text-lime" : "text-mute/50"}`}>
-              {reveal ? `#${winner} · pot → winners` : "settling…"}
+              {reveal ? `#${winner} · haul → miners` : "sealing…"}
             </span>
           </div>
         </div>
@@ -318,16 +318,16 @@ function SceneRewards() {
   const drip = useCountUp(86400, 1600, 0);
   const nvda = useCountUp(0.42, 1500, 2);
   const chips = [
-    { i: 0, cls: "floaty", label: "Winners split", val: `${usdg} USDG`, sub: "losers' pot, pro-rata", tone: "text-lime" },
+    { i: 0, cls: "floaty", label: "Miners split", val: `${usdg} USDG`, sub: "the block's haul, pro-rata", tone: "text-lime" },
     { i: 1, cls: "floaty floaty-2", label: "DRIP burned", val: `${drip} 🔥`, sub: "70% of every buyback", tone: "text-white" },
     { i: 2, cls: "floaty floaty-3", label: "Winners also earn", val: `${nvda} NVDA`, sub: "tokenized stock", tone: "text-white" },
-    { i: 3, cls: "floaty floaty-4", label: "The Motherlode", val: "1-in-625", sub: "a jackpot round can hit", tone: "text-lime" },
+    { i: 3, cls: "floaty floaty-4", label: "The Motherlode", val: "1-in-625", sub: "a motherlode dig can strike", tone: "text-lime" },
   ];
   return (
     <div className="text-center">
       <p className="rise rise-1 text-sm font-semibold uppercase tracking-[0.3em] text-lime">Where it flows</p>
       <h2 className="rise rise-2 mx-auto mt-4 max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-5xl">
-        Every round pays four ways.
+        Every dig pays four ways.
       </h2>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {chips.map((c) => (
@@ -353,12 +353,12 @@ function SceneCTA({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="text-center">
       <h2 className="rise rise-1 mx-auto max-w-3xl text-4xl font-bold leading-tight text-white sm:text-6xl">
-        A block wins every 60 seconds.
+        A block strikes ore every 60 seconds.
         <br />
         <span className="shimmer">Make the next one yours.</span>
       </h2>
       <p className="rise rise-2 mx-auto mt-5 max-w-md text-base text-mute">
-        Connect your wallet, deploy on a block, and settle in seconds. No sign-ups, no custody — you
+        Connect your wallet, deploy on a block, and harvest in seconds. No sign-ups, no custody — you
         hold your keys the whole way.
       </p>
       <div className="rise rise-3 mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -377,7 +377,7 @@ function SceneCTA({ onEnter }: { onEnter: () => void }) {
         </button>
       </div>
       <p className="rise rise-4 mt-8 text-xs text-mute/60">
-        A game of chance, played on-chain. Not available where prohibited.
+        Provably-fair on-chain mining. Not available where prohibited.
       </p>
     </div>
   );

@@ -311,7 +311,7 @@ export default function MinePage() {
           address: vaultAddr, abi: autoMineVaultAbi, functionName: "configure",
           args: [targets.map((t) => t), perTile, autoRounds], chainId: CHAIN_ID,
         });
-        setTxMsg(`Auto-mine started · ${autoRounds} round${autoRounds > 1 ? "s" : ""} — mining hands-off.`);
+        setTxMsg(`Auto-mine started · ${autoRounds} dig${autoRounds > 1 ? "s" : ""} — mining hands-off.`);
         setSelected([]);
         setTimeout(() => { vaultPlan.refetch(); vaultAllowance.refetch(); }, 3000);
       } catch (e) {
@@ -449,7 +449,7 @@ export default function MinePage() {
     try {
       setTxMsg(`Harvesting round #${round}…`);
       await writeContractAsync({ address: addresses.gridMine as `0x${string}`, abi: gridMineAbi, functionName: "harvest", args: [BigInt(round)], gas: BigInt(400000) });
-      setTxMsg(`Harvested round #${round} ✓`);
+      setTxMsg(`Harvested dig #${round} ✓`);
       setTimeout(() => { chain.refetch(); pending.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
     } catch (e) {
       setTxMsg(friendlyError(e, "Couldn't harvest — please try again."));
@@ -472,7 +472,7 @@ export default function MinePage() {
         return; // stop the batch on the first failure/rejection
       }
     }
-    setTxMsg(`Harvested ${roundsToDo.length} round${roundsToDo.length > 1 ? "s" : ""} ✓`);
+    setTxMsg(`Harvested ${roundsToDo.length} dig${roundsToDo.length > 1 ? "s" : ""} ✓`);
     setTimeout(() => { chain.refetch(); pending.refetch(); refiningClaimable.refetch(); dripBal.refetch(); nvdaBal.refetch(); }, 3000);
   };
 
@@ -629,17 +629,17 @@ export default function MinePage() {
       {live && chainReady && roundShown > 1 && timeShown === 0 && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="h-2 w-2 animate-ping rounded-full bg-lime" /> Round #{roundShown} ended — settling…
+            <span className="h-2 w-2 animate-ping rounded-full bg-lime" /> Dig #{roundShown} sealed — distributing ore…
           </div>
           <div className="mt-1 text-[11px] text-mute">
-            The keeper is picking the winner, buying &amp; distributing DRIP/NVDA, and opening the next round — or just deploy again to jump into a fresh one.
+            The keeper is reading which block struck ore, buying &amp; distributing DRIP/NVDA, and opening the next dig — or just deploy again to jump into a fresh one.
           </div>
           {/* Settling is permissionless: if the keeper is slow, ANY connected player can push the round
               over (and process its rewards) so it doesn't hang. Costs a little gas; optional. */}
           {isConnected && (
             <button onClick={settleAndProcess} disabled={settling}
               className="mt-3 w-full rounded-xl border border-lime/40 bg-lime/10 py-2 text-xs font-semibold text-lime disabled:opacity-60">
-              {settling ? "Settling…" : "Settle this round now"}
+              {settling ? "Sealing…" : "Seal this dig now"}
             </button>
           )}
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
@@ -650,7 +650,7 @@ export default function MinePage() {
       {revealing && (
         <div className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-sm font-semibold text-white">
           <span className="h-2 w-2 animate-ping rounded-full bg-lime" />
-          Finding the winning block…
+          Reading which block struck ore…
         </div>
       )}
 
@@ -658,7 +658,7 @@ export default function MinePage() {
       {liveWin && !revealing && (
         <div className="mx-4 mt-4 rounded-2xl border border-lime/40 bg-lime/10 px-4 py-3 text-center">
           <div className="text-sm font-semibold text-white">
-            {liveWin.motherlodeHit ? "🎰 MOTHERLODE · " : "⛏️ "}Block #{liveWin.tile} struck · round #{liveWin.round}
+            {liveWin.motherlodeHit ? "💎 MOTHERLODE · " : "⛏️ "}Block #{liveWin.tile} struck · dig #{liveWin.round}
           </div>
           <div className="mt-0.5 text-[11px] text-mute">A fresh round is live — deploy to jump in.</div>
         </div>
@@ -666,7 +666,7 @@ export default function MinePage() {
 
       {result && (
         <div className={`mx-4 mt-4 rounded-2xl border p-4 text-sm ${result.won ? "border-lime/40 bg-lime/10 text-white" : "border-line bg-panel text-mute"}`}>
-          <div className="font-semibold text-white">Round #{round} — block {result.tile} struck{result.motherlodeHit ? " · 🎰 MOTHERLODE" : ""}</div>
+          <div className="font-semibold text-white">Dig #{round} — block {result.tile} struck{result.motherlodeHit ? " · 💎 MOTHERLODE" : ""}</div>
           <div className="mt-1">
             {result.won ? (
               <>
@@ -694,9 +694,9 @@ export default function MinePage() {
             onClick={() => { if (live && roundShown > 1) setShowHistory(true); }}
             disabled={live && roundShown <= 1}
             className="mx-4 mt-4 flex w-[calc(100%-2rem)] items-center justify-between rounded-xl border border-line bg-panel/60 px-4 py-2 text-xs transition-colors enabled:hover:border-mute/50 disabled:cursor-default">
-            <span className="uppercase tracking-wide text-mute">Last round</span>
+            <span className="uppercase tracking-wide text-mute">Last dig</span>
             {live && roundShown <= 1 ? (
-              <span className="text-mute">No rounds settled yet</span>
+              <span className="text-mute">No digs sealed yet</span>
             ) : (
               <span className="flex items-center gap-2 text-mute">
                 <span className="flex items-center gap-1"><Grid4 /> {live ? roundShown - 1 : last?.tile}</span>
@@ -849,7 +849,7 @@ export default function MinePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-white">Auto-mine ⛏️</div>
-                  <div className="text-[11px] text-mute">{vaultReady ? "Deposit once — it mines every round for you, hands-off." : "Re-deploy your blocks every round — one quick confirm each."}</div>
+                  <div className="text-[11px] text-mute">{vaultReady ? "Deposit once — it mines every dig for you, hands-off." : "Re-deploy your blocks every dig — one quick confirm each."}</div>
                 </div>
                 <button role="switch" aria-checked={autoMode} aria-label="Toggle auto-mine"
                   onClick={() => setAutoMode((v) => !v)}
@@ -861,7 +861,7 @@ export default function MinePage() {
               {autoMode && !autoRunning && (
                 <>
                   <div className="mt-3 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-wide text-mute">Rounds</span>
+                    <span className="text-xs uppercase tracking-wide text-mute">Digs</span>
                     <div className="flex items-center gap-1.5">
                       {[5, 10, 25].map((n) => (
                         <button key={n} onClick={() => setAutoRounds(n)}
@@ -874,10 +874,10 @@ export default function MinePage() {
                     </div>
                   </div>
                   <div className="mt-2 text-[11px] leading-relaxed text-mute">
-                    Deposit <span className="font-semibold text-white">{fmt(amount * Math.max(1, targets.length) * autoRounds, 2)} USDG</span> for {autoRounds} round{autoRounds > 1 ? "s" : ""} ({fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}/round).{" "}
+                    Deposit <span className="font-semibold text-white">{fmt(amount * Math.max(1, targets.length) * autoRounds, 2)} USDG</span> for {autoRounds} dig{autoRounds > 1 ? "s" : ""} ({fmt(amount * Math.max(1, targets.length), (amount * Math.max(1, targets.length)) % 1 ? 2 : 0)}/dig).{" "}
                     {vaultReady
-                      ? "You approve + start ONCE; then it mines every round automatically — no more signing. Stop anytime to get unspent USDG back."
-                      : "You approve USDG once; each round is a quick confirm in your wallet. Stops automatically after the last round or if funds run out."}
+                      ? "You approve + start ONCE; then it mines every dig automatically — no more signing. Stop anytime to get unspent USDG back."
+                      : "You approve USDG once; each dig is a quick confirm in your wallet. Stops automatically after the last dig or if funds run out."}
                   </div>
                 </>
               )}
@@ -916,7 +916,7 @@ export default function MinePage() {
           {txMsg && <p className="mt-2 text-center text-[11px] text-lime">{txMsg}</p>}
           {live && (
             <p className="mt-1 text-center text-[11px] text-mute/70">
-              Amount is <strong>per block</strong> — total = amount × blocks. Winnings are live: harvest each settled round below, then refine your DRIP.
+              Amount is <strong>per block</strong> — total = amount × blocks. Your haul is live: harvest each sealed dig below, then refine your DRIP.
             </p>
           )}
         </div>
@@ -936,7 +936,7 @@ export default function MinePage() {
               {pending.rounds.map((r) => (
                 <div key={r.round} className="flex items-center justify-between rounded-lg border border-line bg-ink/40 px-3 py-2 text-xs">
                   <div>
-                    <div className="font-semibold text-white">Round #{r.round}</div>
+                    <div className="font-semibold text-white">Dig #{r.round}</div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-mute">
                       {r.usdg > 0 && <span className="flex items-center gap-1"><Usdg /> {compact(r.usdg)}</span>}
                       {r.drip > 0 && <span className="flex items-center gap-1"><Drip /> {compact(r.drip)}</span>}
@@ -1031,8 +1031,8 @@ export default function MinePage() {
 
       <p className="px-4 py-6 text-center text-[11px] text-mute/60">
         {live
-          ? "On-chain · Robinhood Chain. A game of chance; not available where prohibited."
-          : "Demo · fake funds, no chain. A game of chance; not available where prohibited."}
+          ? "On-chain · Robinhood Chain. Provably-fair, chance-based mining; not available where prohibited."
+          : "Demo · test funds, no chain. Provably-fair, chance-based mining; not available where prohibited."}
       </p>
 
       {/* Last-round history — real settled rounds from the chain (winning tile, pot, your result). */}
@@ -1042,8 +1042,8 @@ export default function MinePage() {
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">Round history</h2>
-                <p className="text-sm text-mute">Real settled rounds on Robinhood Chain.</p>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">Dig history</h2>
+                <p className="text-sm text-mute">Real sealed digs on Robinhood Chain.</p>
               </div>
               <button onClick={() => setShowHistory(false)} className="text-mute hover:text-white" aria-label="Close">✕</button>
             </div>
@@ -1053,15 +1053,15 @@ export default function MinePage() {
                 <div className="py-8 text-center text-sm text-mute">Loading…</div>
               )}
               {!history.loading && history.rows.length === 0 && (
-                <div className="py-8 text-center text-sm text-mute">No settled rounds yet.</div>
+                <div className="py-8 text-center text-sm text-mute">No sealed digs yet.</div>
               )}
               {history.rows.map((r) => (
                 <div key={r.round} className={`rounded-xl border p-3 ${r.youWon ? "border-lime/40 bg-lime/10" : "border-line bg-panel/60"}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      Round #{r.round}
+                      Dig #{r.round}
                       {r.youWon && <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink">YOU MINED</span>}
-                      {r.motherlodeHit && <span className="rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-bold text-ink">🎰 MOTHERLODE</span>}
+                      {r.motherlodeHit && <span className="rounded-full bg-yellow-500 px-2 py-0.5 text-[10px] font-bold text-ink">💎 MOTHERLODE</span>}
                     </div>
                     <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-ink">{r.hadWinner ? (r.soloMode ? "Solo" : "Split") : "No winner"}</span>
                   </div>

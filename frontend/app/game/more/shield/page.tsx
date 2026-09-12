@@ -31,9 +31,9 @@ export default function ShieldPage() {
         ))}
       </div>
       <div className="mt-5 rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-xs text-mute">
-        <span className="font-semibold text-yellow-500">Honest note.</span> This is a real-money game of chance and a
-        pre-launch demo. Secure randomness and legal/geo review must be in place before any mainnet round. See the repo
-        blockers for the full list.
+        <span className="font-semibold text-yellow-500">Honest note.</span> This is a real-money, chance-based on-chain
+        game and a pre-launch demo. Secure randomness and legal/geo review must be in place before any mainnet dig. See
+        the repo blockers for the full list.
       </div>
     </MorePage>
   );

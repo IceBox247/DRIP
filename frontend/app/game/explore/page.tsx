@@ -24,8 +24,8 @@ export default function ExplorePage() {
     <MorePage title="Explore" subtitle="Live block stats & leaderboards — on-chain.">
       <Section title="Overview">
         <Grid>
-          <Stat label="Rounds settled" value={fmt(s.roundsSettled)} sub="all-time" />
-          <Stat label="Motherlode pool" value={`${compact(s.motherlode)} DRIP`} sub="current jackpot" />
+          <Stat label="Digs sealed" value={fmt(s.roundsSettled)} sub="all-time" />
+          <Stat label="Motherlode pool" value={`${compact(s.motherlode)} DRIP`} sub="current motherlode" />
           <Stat label="DRIP supply" value={`${compact(s.totalSupply)} DRIP`} sub="in circulation" />
           <Stat label="DRIP burnt" value={`${compact(s.burned)} DRIP`} sub="all-time — 70% of each cut" />
           <Stat label="DRIP bonded" value={`${compact(s.bonded)} DRIP`} sub="in the Pons curve" />
@@ -50,19 +50,19 @@ export default function ExplorePage() {
             {(["rounds", "motherlodes"] as const).map((t) => (
               <button key={t} onClick={() => setAct(t)}
                 className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${act === t ? "bg-white text-ink" : "text-mute"}`}>
-                {t}
+                {t === "rounds" ? "Digs" : "Motherlodes"}
               </button>
             ))}
           </div>
         </div>
         <p className="mb-3 text-xs text-mute">
-          {act === "rounds" ? "Recent settled rounds on-chain." : "Recent rounds where the motherlode hit."}
+          {act === "rounds" ? "Recent sealed digs on-chain." : "Recent digs where the motherlode struck."}
         </p>
         <div className="overflow-x-auto rounded-2xl border border-line bg-panel">
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead>
               <tr className="border-b border-line/60 text-[11px] uppercase tracking-wide text-mute">
-                <th className="px-3 py-2.5 font-medium">Round</th>
+                <th className="px-3 py-2.5 font-medium">Dig</th>
                 <th className="px-3 py-2.5 font-medium">Block</th>
                 <th className="px-3 py-2.5 font-medium">Type</th>
                 <th className="px-3 py-2.5 text-right font-medium">Pool</th>
@@ -72,7 +72,7 @@ export default function ExplorePage() {
             </thead>
             <tbody className="divide-y divide-line/40">
               {rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-6 text-center text-mute">{s.loading ? "Loading…" : "No settled rounds yet."}</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-mute">{s.loading ? "Loading…" : "No sealed digs yet."}</td></tr>
               ) : rows.map((row) => (
                 <tr key={row.round} className="text-white/90">
                   <td className="whitespace-nowrap px-3 py-2.5 font-mono text-mute">#{fmt(row.round)}</td>
@@ -81,7 +81,7 @@ export default function ExplorePage() {
                     {!row.hadWinner
                       ? <span className="rounded-full bg-panel2 px-2.5 py-0.5 text-[11px] font-semibold text-mute">No winner</span>
                       : row.motherlodeHit
-                        ? <span className="rounded-full bg-yellow-500 px-2.5 py-0.5 text-[11px] font-semibold text-ink">🎰 Motherlode</span>
+                        ? <span className="rounded-full bg-yellow-500 px-2.5 py-0.5 text-[11px] font-semibold text-ink">💎 Motherlode</span>
                         : <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink">{row.soloMode ? "Solo" : "Split"}</span>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-right"><Usdg />{compact(row.totalIn)}</td>

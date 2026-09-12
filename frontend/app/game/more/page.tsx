@@ -35,7 +35,7 @@ export default function MorePage() {
         <div className="mt-2 space-y-2">{external.map((it) => <MenuRow key={it.href} {...it} />)}</div>
 
         <p className="mt-8 text-center text-[11px] text-mute/60">
-          Drip on {site.chain} · pre-launch demo. A game of chance; not available where prohibited.
+          Drip on {site.chain} · pre-launch demo. Provably-fair, chance-based mining; not available where prohibited.
         </p>
       </div>
     </AppChrome>

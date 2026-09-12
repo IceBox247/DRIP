@@ -7,7 +7,7 @@ export const metadata = { title: "Rewards — Drip" };
 const drip = [
   { pct: gridMine.cutSplitBurnBps / 100, label: "Burned (DRIP)", note: "deflationary — helps every holder", color: "bg-red-400" },
   { pct: gridMine.cutSplitStakersBps / 100, label: "Stakers (DRIP)", note: "StakeVault — stake DRIP to earn it", color: "bg-lime" },
-  { pct: gridMine.cutSplitMotherlodeBps / 100, label: "Motherlode (DRIP)", note: `jackpot — 1/${gridMine.motherlodeOdds} dumps to winners`, color: "bg-yellow-500" },
+  { pct: gridMine.cutSplitMotherlodeBps / 100, label: "Motherlode (DRIP)", note: `motherlode — 1/${gridMine.motherlodeOdds} dumps to the dig's miners`, color: "bg-yellow-500" },
   { pct: gridMine.cutSplitWinnersBps / 100, label: "Winners — DRIP", note: "this round's winners (1-or-all, via refining)", color: "bg-cyan-400" },
   { pct: gridMine.cutSplitWinnersNvdaBps / 100, label: "Winners — NVDA", note: "buys tokenized NVIDIA for winners (1-or-all)", color: "bg-violet-400" },
 ];
