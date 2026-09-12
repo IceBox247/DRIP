@@ -155,7 +155,17 @@ export default function MinePage() {
         : empty()) // real mode, still loading → zeros (deterministic), never random demo tiles
     : tiles;
   const poolShown = live ? chain.pool : pool;
-  const timeShown = live ? chain.timeLeft : timeLeft;
+  // Live timer: the chain's timeLeft only refreshes every ~2s (an RPC read), so on its own the display
+  // jumps 2-3s at a time. Keep a local 1s ticker that counts down smoothly and re-syncs to the chain
+  // value on every fresh read (so it stays accurate without stepping).
+  const [liveClock, setLiveClock] = useState(0);
+  useEffect(() => { if (live) setLiveClock(chain.timeLeft); }, [live, chain.timeLeft]);
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => setLiveClock((t) => (t > 0 ? t - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, [live]);
+  const timeShown = live ? liveClock : timeLeft;
   const motherlodeShown = live ? chain.motherlode : motherlode;
   const roundShown = live ? chain.round : round;
   // Winnings: real on-chain reads when live, demo state otherwise. Unrefined = DRIP in the
