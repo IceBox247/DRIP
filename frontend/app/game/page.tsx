@@ -10,6 +10,7 @@ import { useLiveRound } from "@/lib/useLiveRound";
 import { useLiveMiners } from "@/lib/useLiveMiners";
 import { usePendingWinnings } from "@/lib/usePendingWinnings";
 import { useRoundHistory } from "@/lib/useRoundHistory";
+import { useBackClose } from "@/lib/useBackClose";
 import { compact, friendlyError } from "@/lib/format";
 import { gridMine } from "@/lib/site";
 
@@ -105,6 +106,11 @@ export default function MinePage() {
   const [revealing, setRevealing] = useState(false); // "finding the winner" animation phase
   const [revealTile, setRevealTile] = useState<number | null>(null);
   const [sparkles] = useState<boolean[]>(() => Array.from({ length: N }, () => Math.random() < 0.4));
+
+  // Phone Back button (and browser Back) closes an open sheet instead of leaving the page — so you're
+  // never stuck inside the Rewards/History sheet on Android.
+  useBackClose(showRewards, () => setShowRewards(false));
+  useBackClose(showHistory, () => setShowHistory(false));
 
   const pool = useMemo(() => tiles.reduce((s, t) => s + t.mine + t.others, 0), [tiles]);
   const targets = mode === "lite" ? Array.from({ length: N }, (_, i) => i) : selected;
@@ -762,14 +768,16 @@ export default function MinePage() {
       {/* Rewards / claim overlay (ORE-style: pick a %, see the refining fee, claim). */}
       {showRewards && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowRewards(false)}>
-          <div className="mx-auto w-full max-w-md rounded-t-3xl border-t border-line bg-ink px-5 pb-8 pt-5" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
-            <div className="flex items-center justify-between">
+          <div className="mx-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-y-auto rounded-t-3xl border-t border-line bg-ink px-5 pb-8 pt-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-line" />
+            {/* Sticky header so the close (✕) is ALWAYS reachable, even when the sheet is taller than the screen. */}
+            <div className="sticky top-0 z-10 -mx-5 flex items-center justify-between border-b border-line/60 bg-ink px-5 pb-3">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">Rewards</h2>
                 <p className="text-sm text-mute">Refine your DRIP into your wallet.</p>
               </div>
-              <button onClick={() => setShowRewards(false)} className="text-mute hover:text-white" aria-label="Close">✕</button>
+              <button onClick={() => setShowRewards(false)} aria-label="Close"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-mute hover:text-white">✕</button>
             </div>
 
             <div className="mt-6 text-center text-6xl font-semibold text-white">{claimPct}%</div>
@@ -818,6 +826,12 @@ export default function MinePage() {
                   ? `Harvest ${pending.rounds.length} round${pending.rounds.length > 1 ? "s" : ""} · ${fmt(pending.totalUsdg, 2)} USDG`
                   : "Nothing to harvest"
                 : usdgWon > 0 ? `Claim ${fmt(usdgWon)} USDG` : "No USDG to claim"}
+            </button>
+
+            {/* Always-reachable exit at the bottom of the sheet (in addition to the sticky ✕ and Back). */}
+            <button onClick={() => setShowRewards(false)}
+              className="mt-3 w-full rounded-2xl border border-line py-3.5 text-sm font-semibold text-mute hover:text-white">
+              Close
             </button>
           </div>
         </div>
